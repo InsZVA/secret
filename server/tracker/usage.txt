@@ -1,0 +1,1 @@
+>ffmpeg -f dshow -i video="screen-capture-recorder" -f dshow -i audio="virtual-audio-capturer" -c:v libvpx -r 30 -c:a libvorbis out2.webm -threads 8

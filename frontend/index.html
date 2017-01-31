@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>InsLive Test Page</title>
+</head>
+<body>
+    <input id="i" type="file" onchange="handlerFile(this)" >
+    <video controls autoplay id="v" width="640" height="480"></video>
+
+    <script>
+
+        /**
+         * Read an EBML tag header or length and return their respective values into
+         * single numbers.
+         *
+         * @example
+         * var tagHeader = new Uint8Array([0x1A, 0x45, 0xDF, 0xA3, 0x01, 0x00, 0x00,
+         *                                 0x00, 0x00, 0x00, 0x00, 0x1F]);
+         * var tagId = readVariableInt(tagHeader, 4, 0);
+         * console.log('The current tag ID is: ', tagId.value, ', skipping ', tagId.size, ' bytes.');
+         * // The current tag ID is: 172351395, skipping 4 bytes.
+         *
+         * var tagLength = readVariableInt(tagHeader, 8, tagId.size);
+         * console.log('The tag's length is: ', tagLength.value, ', skipping ', tagLength.size, ' bytes.');
+         * // The tag's length is 31, skipping 8 bytes.
+         *
+         * @param {Uint8Array} bytes
+         * @param {number} maxSize
+         * @param {number} offset
+         * @returns {{size: number, value: number}}
+         */
+        function readVariableInt(bytes, maxSize, offset) {
+            var index = (offset && offset > 0) ? offset : 0;
+            var count = 1;
+            var length = bytes[index];
+            var bytesRead = 1;
+            var lengthMask = 0x80;
+
+            if (!length) {
+                return null;
+            }
+
+            while (bytesRead <= maxSize && !(length & lengthMask)) {
+                bytesRead++;
+                lengthMask >>= 1;
+            }
+
+            if (bytesRead > maxSize) {
+                return null;
+            }
+
+            length &= ~lengthMask;
+            while (count++ < bytesRead) {
+                length = (length << 8) | bytes[++index];
+            }
+
+            return {
+                size: bytesRead,
+                value: length
+            };
+        }
+
+        var ms = new MediaSource();
+        var ve = document.getElementById("v");
+        var sourceBuffer;
+        ve.src = URL.createObjectURL(ms);
+
+        function handlerFile(i) {
+            var f = i.files[0];
+            console.log(f);
+            var fr = new FileReader();
+            fr.onloadend = function(e) {
+                var data = new Uint8Array(e.target.result);
+                var tagId = readVariableInt(data, 4, 0);
+                var tagLength = readVariableInt(data, 8, tagId.size);
+                var header = data.slice(0, tagId.size + tagLength.size + tagLength.value);
+                var segment = data.slice(tagId.size + tagLength.size + tagLength.value);
+                var mimeType = 'video/webm; codecs="vp8, vorbis"';
+                console.log(header);
+                sourceBuffer = ms.addSourceBuffer(mimeType);
+                sourceBuffer.appendBuffer(new Uint8Array(segment));
+                console.log(sourceBuffer);
+                ve.play();
+                //ms.endOfStream();
+            };
+            fr.readAsArrayBuffer(f);
+        }
+    </script>
+</body>
+</html>

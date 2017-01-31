@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Video Test Page</title>
+</head>
+<body>
+<video id="v" controls></video>
+<script src="../priorityqueue.js"></script>
+<script src="../videobuffer.js"></script>
+<script src="../video.js"></script>
+
+<script>
+    var vb = new VideoBuffer();
+    vb.onstatechanged = function(state) {
+        console.log("state changed to", state);
+    };
+    vb.ondataready = function(b) {
+        console.log("data ready:", b);
+    };
+
+    var v = new Video(document.getElementById("v"), vb);
+
+    function readUint64(data, offset) {
+        var ret = 0;
+        for (var i = offset; i < offset + 8; i++) {
+            ret *= 256;
+            ret += data[i];
+        }
+        return ret;
+    }
+
+    var ws = new WebSocket("ws://127.0.0.1:8080/stream");
+    ws.binaryType = 'arraybuffer';
+    ws.onmessage = function(e) {
+        // struct msg {
+        //     uint32_t dataoffset;
+        //     uint64_t createtimestamp;
+        //     uint64_t nexttimestamp;
+        //     ...
+        //     uint8_t  videostream;
+        // }
+        var data = new Uint8Array(e.data);
+        var vs = new VideoSlice(
+            readUint64(data, 4),
+            readUint64(data, 12),
+            new Uint8Array(data.slice((data[3])))
+        );
+        vb.pushVideoSlice(vs);
+    };
+    ws.onopen = function() {
+        vb.fastload();
+    };
+
+</script>
+</body>
+</html>
