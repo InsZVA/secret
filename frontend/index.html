@@ -79,7 +79,7 @@
                 var mimeType = 'video/webm; codecs="vp8, vorbis"';
                 console.log(header);
                 sourceBuffer = ms.addSourceBuffer(mimeType);
-                sourceBuffer.appendBuffer(new Uint8Array(segment));
+                sourceBuffer.appendBuffer(new Uint8Array(data));
                 console.log(sourceBuffer);
                 ve.play();
                 //ms.endOfStream();
