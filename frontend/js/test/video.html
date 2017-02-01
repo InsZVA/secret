@@ -5,21 +5,30 @@
     <title>Video Test Page</title>
 </head>
 <body>
-<video id="v" controls></video>
+<video id="v" controls autoplay></video>
 <script src="../priorityqueue.js"></script>
 <script src="../videobuffer.js"></script>
 <script src="../video.js"></script>
 
 <script>
-    var vb = new VideoBuffer();
-    vb.onstatechanged = function(state) {
+    var vb = [];
+    vb[0] = new VideoBuffer();
+    vb[1] = new VideoBuffer();
+    vb[0].onstatechanged = function(state) {
         console.log("state changed to", state);
     };
-    vb.ondataready = function(b) {
-        console.log("data ready:", b);
+    vb[0].ondataready = function(b) {
+        v.ondata("vp9", b);
+    };
+    vb[1].onstatechanged = function(state) {
+        console.log("state changed to", state);
+    };
+    vb[1].ondataready = function(b) {
+        v.ondata("vorbis", b);
     };
 
-    var v = new Video(document.getElementById("v"), vb);
+    var v = new Video(document.getElementById("v"));
+
 
     function readUint64(data, offset) {
         var ret = 0;
@@ -30,26 +39,40 @@
         return ret;
     }
 
-    var ws = new WebSocket("ws://127.0.0.1:8080/stream");
+    var ws = new WebSocket("ws://127.0.0.1:8888/stream/test");
     ws.binaryType = 'arraybuffer';
+    var inited = 0;
     ws.onmessage = function(e) {
         // struct msg {
         //     uint32_t dataoffset;
         //     uint64_t createtimestamp;
         //     uint64_t nexttimestamp;
+        //     char[]   codec;
         //     ...
         //     uint8_t  videostream;
         // }
+
+        if (inited < 2) {
+            var data = new Uint8Array(e.data);
+            var offset = data[3];
+            vb[inited].fastload();
+            vb[inited].ondataready(new Uint8Array(data.slice(offset)));
+            inited++;
+            return
+        }
+
         var data = new Uint8Array(e.data);
+        var offset = data[3];
         var vs = new VideoSlice(
             readUint64(data, 4),
             readUint64(data, 12),
             new Uint8Array(data.slice((data[3])))
         );
-        vb.pushVideoSlice(vs);
-    };
-    ws.onopen = function() {
-        vb.fastload();
+        var codec = new TextDecoder("utf-8").decode(data.slice(20, offset));
+        if (codec == "vp9")
+            vb[0].pushVideoSlice(vs);
+        else
+            vb[1].pushVideoSlice(vs);
     };
 
 </script>

@@ -9,10 +9,7 @@ func main() {
 		panic("Config error!")
 	}
 
-	port := Config.getString("listenPort", "8080")
-	http.HandleFunc("/time", TimeHandler)
-	http.HandleFunc("/input.webm", InputHandler)
-	http.HandleFunc("/stream", StreamHandler)
+	port := Config.getString("listenPort", "8888")
 
-	http.ListenAndServe(":" + port, nil)
+	debug(http.ListenAndServe(":" + port, router))
 }

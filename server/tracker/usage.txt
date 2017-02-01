@@ -1,1 +1,20 @@
->ffmpeg -f dshow -i video="screen-capture-recorder" -f dshow -i audio="virtual-audio-capturer" -c:v libvpx -r 30 -c:a libvorbis out2.webm -threads 8
+Living-stream capture:
+./ffmpeg   -f dshow -i video="screen-capture-recorder" -f dshow -i audio="virtual-audio-capturer" -map 0:0 -pix_fmt yuv420p -c:v libvpx-vp9 -keyint_min 60 -g 60 -speed 6 -tile-columns 4 -frame-parallel 1 -threads 8 -static-thresh 0 -max-intra-rate 300 -deadline realtime -lag-in-frames 0 -error-resilient 1 -b:v 3000k  -f webm_chunk -header ./out/glass_360.hdr -chunk_start_index 1 ./out/glass_360_%d.chk -map 1:0 -c:a libvorbis -f webm_chunk -audio_chunk_duration 2000 -header ./out/glass_171.hdr -chunk_start_index 1 ./out/glass_171_%d.chk
+sleep 3000
+./ffmpeg -f webm_dash_manifest -live 1 -i ./out/glass_360.hdr -f webm_dash_manifest -live 1  -i ./out/glass_171.hdr -c copy -map 0 -map 1 -f webm_dash_manifest -live 1 -adaptation_sets "id=0,streams=0 id=1,streams=1" -chunk_start_index 1 -chunk_duration_ms 2000 -time_shift_buffer_depth 7200 -minimum_update_period 7200  ./out/1.mpd
+
+./ffmpeg   -f dshow -i video="screen-capture-recorder" -f dshow -i audio="virtual-audio-capturer" -map 0:0 -pix_fmt yuv420p -c:v libvpx-vp9 -keyint_min 60 -g 60 -speed 6 -tile-columns 4 -frame-parallel 1 -threads 8 -static-thresh 0 -max-intra-rate 300 -deadline realtime -lag-in-frames 0 -error-resilient 1 -b:v 3000k  -f webm_chunk -header ./out/glass_360.hdr -chunk_start_index 1 ./out/glass_360_%d.chk -map 1:0 -c:a libvorbis -f webm_chunk -audio_chunk_duration 2000 -header ./out/glass_171.hdr -chunk_start_index 1 ./out/glass_171_%d.chk
+
+Things to note:
+This is a never ending command, so this should probably be run in the background.
+If you get warnings about Alsa or V4L2 thread queue not being enough, try increasing the "-thread_queue_size" parameter.
+File name of the header should conform to the following format: <prefix>_<representation_id>.hdr
+File name of the chunks should conform to the following format: <prefix>_<representation_id>_%d.chk
+The input audio/video sources and their parameters can change based upon the OS and drivers that you have in your machine. See FFmpeg's device documentation for more information on which source and parameters to use.
+The "map" parameter has to be modified in such a way that the input video stream is routed to the video encoder and the input audio stream is routed to the audio encoder. For more information, see FFmpeg's map option documentation.
+The video and audio chunks have to be in sync. This is ensured by following these rules:
+The "keyint_min" and "g" parameters to the video encoder should always be the same.
+The "keyint_min" parameter should be in sync with the "audio_chunk_duration" parameter passed to the audio encoder (keyint_min is expressed in number of frames whereas audio_chunk_duration is expressed in milliseconds). In the given example, the video frame rate is 30 fps, so keyint_min of 150 means that each chunk is of duration 5000 milliseconds (5 seconds).
+More than one video/audio stream can be created this way by merely adding another "webm_chunk" output to the above command.
+
+ffmpeg -i http://www.sample-videos.com/video/mp4/720/big_buck_bunny_720p_10mb.mp4 -map 0:0 -c:v libvpx-vp9 -s 640x360 -keyint_min 50 -g 50 -tile-columns 4 -frame-parallel 1 -b:v 3000k -f webm_chunk -header webm_video_360.hdr -chunk_start_index 1 webm_video_360_%d.chk -map 0:1 -c:a libvorbis -b:a 128k -ar 44100 -f webm_chunk -audio_chunk_duration 2000 -header webm_audio_128.hdr -chunk_start_index 1 webm_audio_128_%d.chk
