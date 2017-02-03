@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Video Test Page</title>
+</head>
+<body>
+<p>请将服务器配置成以chunk为单位传输，以及没有缓存。例如：</p>
+<pre>
+{
+    "transport": "chunk",
+    "cacheLength": 0
+}
+</pre>
+
+<video id="v" autoplay></video>
+<script src="../bigendian.js"></script>
+<script src="../restructor.js"></script>
+<script src="../mse.js"></script>
+
+<script>
+    var v = document.getElementById("v");
+    var mse;
+    var ws = new WebSocket("ws://127.0.0.1:8888/stream/test");
+    ws.binaryType = 'arraybuffer';
+    var inited = 0;
+    var initmsg = [];
+    ws.onmessage = function(e) {
+        // struct chunk {
+        //     uint32_t offset;
+        //     uint32_t id;
+        //     char[]   codec;
+        //     ...
+        //     uint8_t  videostream;
+        // }
+
+        var data, offset;
+        if (inited < 2) {
+            data = new Uint8Array(e.data);
+            initmsg[inited] = new InitMsg(data);
+            inited++;
+            console.log("init");
+            if (inited == 2) {
+                mse = new MSE(v, initmsg[0], initmsg[1]);
+            }
+            return
+        }
+
+        data = new Uint8Array(e.data);
+        offset = bigendian.readUint32(data);
+        var chunk = new Chunk(
+            bigendian.readUint32(data.slice(4)),
+            new Uint8Array(data.slice((data[3])))
+        );
+        var codec = new TextDecoder("utf-8").decode(data.slice(8, offset));
+        if (codec == "vp9")
+            mse.syncChunk(0, chunk);
+        else
+            mse.syncChunk(1, chunk);
+    };
+
+</script>
+</body>
+</html>

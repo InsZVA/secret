@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	CACHED_BUFFER_DURATION = 5500 // more than client
+	CACHED_LENGTH = 0 // more than client
 )
 
 // 0: Video
@@ -61,73 +61,58 @@ type Track struct {
 }
 
 var (
-	broadcast = make(chan []byte, 10)
-
-	upgrader             = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
 )
 
-type ChunkSlice struct {
-	createTimeStamp uint64
-	nextTimeStamp uint64
+type Chunk struct {
+	id uint32
 	codec string
 	data []uint8
 }
 
+func (cs *Chunk) encode() []byte {
+	buffer := make([]byte, 8)
+	binary.BigEndian.PutUint32(buffer[4:], cs.id)
+	buffer = append(buffer, []byte(cs.codec)...)
+	binary.BigEndian.PutUint32(buffer, uint32(len(buffer)))
+	buffer = append(buffer, cs.data...)
+	return buffer
+}
+
 type ChunkBuffer struct {
-	buffer []ChunkSlice
+	buffer []Chunk
 	stream *Stream
 	lock sync.RWMutex
 }
 
-func (cb *ChunkBuffer) onSliceRemove(cs ChunkSlice) {
+func (cb *ChunkBuffer) onSliceRemove(cs Chunk) {
 	//debug("broadcast")
-
 }
 
-func (cb *ChunkBuffer) push(cs ChunkSlice) {
+func (cb *ChunkBuffer) push(cs Chunk) {
 	cb.lock.Lock()
 	defer cb.lock.Unlock()
 
-	if len(cb.buffer) != 0 {
-		// Ensure every slice in buffer is continuous
-		cb.buffer[len(cb.buffer) - 1].nextTimeStamp = cs.createTimeStamp
-	}
 	cb.buffer = append(cb.buffer, cs)
-	if cs.createTimeStamp - cb.buffer[0].createTimeStamp > CACHED_BUFFER_DURATION {
+	if len(cb.buffer) > CACHED_LENGTH {
 		cb.onSliceRemove(cb.buffer[0])
 		cb.buffer = cb.buffer[1:]
 	}
 
-	if len(cb.buffer) > 1 {
-		cs = cb.buffer[len(cb.buffer) - 2]
-		buffer := make([]byte, 20)
-		binary.BigEndian.PutUint64(buffer[4:], cs.createTimeStamp)
-		binary.BigEndian.PutUint64(buffer[12:], cs.nextTimeStamp)
-		buffer = append(buffer, []byte(cs.codec)...)
-		binary.BigEndian.PutUint32(buffer, uint32(len(buffer)))
-		buffer = append(buffer, cs.data...)
-
-		cb.stream.iterateConn(func(conn *Node) {
-			select {
-			case conn.ch <- buffer:
-			default:
-			}
-		})
-	}
+	cb.stream.iterateConn(func(conn *Node) {
+		select {
+		case conn.ch <- cs.encode():
+		default:
+		}
+	})
 }
 
 func (cb *ChunkBuffer) fastload(conn *Node) {
 	cb.lock.RLock() // TODO: lock-free
 	defer cb.lock.RUnlock()
-	for i := 0; i < len(cb.buffer) - 1; i++ {
+	for i := 0; i < len(cb.buffer); i++ {
 		cs := cb.buffer[i]
-		buffer := make([]byte, 20)
-		binary.BigEndian.PutUint64(buffer[4:], cs.createTimeStamp)
-		binary.BigEndian.PutUint64(buffer[12:], cs.nextTimeStamp)
-		buffer = append(buffer, []byte(cs.codec)...)
-		binary.BigEndian.PutUint32(buffer,uint32(len(buffer)))
-		buffer = append(buffer, cs.data...)
-		conn.ch <- buffer
+		conn.ch <- cs.encode()
 	}
 }
 

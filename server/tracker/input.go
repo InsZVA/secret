@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 	"io/ioutil"
-	"time"
+	"strconv"
 )
 
 var streamMap = StreamMap {m: make(map[string]*Stream)}
@@ -97,8 +97,12 @@ func InputHandler(path []string, w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(403); return
 		}
-		ck := ChunkSlice{
-			createTimeStamp: uint64(time.Now().UnixNano() / 1000000),
+		id, err := strconv.Atoi(points[0])
+		if err != nil {
+			w.WriteHeader(403); return
+		}
+		ck := Chunk{
+			id: uint32(id),
 			data: buff,
 		}
 		if fts[0] == "v" {

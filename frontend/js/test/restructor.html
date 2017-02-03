@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Restructor Test</title>
+</head>
+<body>
+<script src="../restructor.js"></script>
+<script>
+    var slice0 = [];
+    var slice3 = [];
+    var i;
+    for (i = 0; i < 5; i++) {
+        slice0[i] = new Slice(0, i, 5, new Uint8Array([1, 2, 3]));
+        slice3[i] = new Slice(3, i, 5, new Uint8Array([1, 2, 3]));
+    }
+    var restructor = new Restructor();
+    restructor.onchunk = function(chk) {
+        console.log(chk.split(2));
+    };
+    restructor.pushSlice(slice0[2]);
+    restructor.pushSlice(slice3[0]);
+    restructor.pushSlice(slice3[1]);
+    restructor.pushSlice(slice0[1]);
+    restructor.pushSlice(slice0[4]);
+    restructor.pushSlice(slice3[2]);
+    restructor.pushSlice(slice0[0]);
+    restructor.pushSlice(slice3[4]);
+    restructor.pushSlice(slice0[3]);
+    restructor.pushSlice(slice3[3]);
+</script>
+</body>
+</html>
