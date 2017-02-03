@@ -2,19 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Video Test Page</title>
+    <title>MSE with restructor and buffer Test</title>
 </head>
 <body>
-<p>请将服务器配置成以chunk为单位传输，以及没有缓存。例如：</p>
+<p>请将服务器配置成以slice为单位传输，以及缓存长度为2。例如：</p>
 <pre>
 {
-    "transport": "chunk",
-    "cacheLength": 0
+    "transport": "slice",
+    "cacheLength": 2
 }
 </pre>
 
 <video id="v" autoplay></video>
 <script src="../bigendian.js"></script>
+<script src="../bufferqueue.js"></script>
 <script src="../restructor.js"></script>
 <script src="../mse.js"></script>
 
@@ -25,6 +26,25 @@
     ws.binaryType = 'arraybuffer';
     var inited = 0;
     var initmsg = [];
+    var restructor = [];
+    var bufferqueue = [];
+    restructor[0] = new Restructor();
+    restructor[1] = new Restructor();
+    bufferqueue[0] = new BufferQueue(2);
+    bufferqueue[1] = new BufferQueue(2);
+    bufferqueue[0].onchunkready = function(chunk) {
+        mse.syncChunk(0, chunk);
+    };
+    bufferqueue[1].onchunkready = function (chunk) {
+        mse.syncChunk(1, chunk);
+    };
+    restructor[0].onchunk = function(chunk) {
+        bufferqueue[0].pushChunk(chunk);
+    };
+    restructor[1].onchunk = function(chunk) {
+        bufferqueue[1].pushChunk(chunk);
+    };
+
     ws.onmessage = function(e) {
         // struct chunk {
         //     uint32_t offset;
@@ -48,15 +68,17 @@
 
         data = new Uint8Array(e.data);
         offset = bigendian.readUint32(data);
-        var chunk = new Chunk(
+        var slice = new Slice(
             bigendian.readUint32(data.slice(4)),
+            bigendian.readUint32(data.slice(8)),
+            bigendian.readUint32(data.slice(12)),
             new Uint8Array(data.slice((offset)))
         );
-        var codec = new TextDecoder("utf-8").decode(data.slice(8, offset));
+        var codec = new TextDecoder("utf-8").decode(data.slice(16, offset));
         if (codec == "vp9")
-            mse.syncChunk(0, chunk);
+            restructor[0].pushSlice(slice);
         else
-            mse.syncChunk(1, chunk);
+            restructor[1].pushSlice(slice);
     };
 
 </script>

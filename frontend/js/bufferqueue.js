@@ -72,5 +72,6 @@ BufferQueue.prototype._iscontinuous = function() {
 BufferQueue.prototype._setState = function(state) {
     if (this._state == state) return;
     this._state = state;
-    this.onstatechange(state);
+    if (this.onstatechange)
+        this.onstatechange(state);
 };

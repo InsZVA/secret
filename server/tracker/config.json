@@ -1,5 +1,5 @@
 {
   "listenPort": 8888,
   "transport": "slice",
-  "cacheLength": 0
+  "cacheLength": 2
 }

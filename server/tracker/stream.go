@@ -8,8 +8,9 @@ import (
 	"sync"
 )
 
-const (
-	CACHED_LENGTH = 0 // more than client
+var (
+	CACHED_LENGTH = 0 // same as client
+	TRANSPORT = "chunk"
 )
 
 // 0: Video
@@ -60,6 +61,14 @@ type Track struct {
 	buffer ChunkBuffer
 }
 
+func (t *Track) encodeInitMsg() []byte {
+	buff := make([]byte, 4)
+	buff = append(buff, []byte(t.codec)...)
+	binary.BigEndian.PutUint32(buff, uint32(len(buff)))
+	buff = append(buff, t.initChunk...)
+	return buff
+}
+
 var (
 	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
 )
@@ -79,6 +88,47 @@ func (cs *Chunk) encode() []byte {
 	return buffer
 }
 
+func (cs *Chunk) split(n int) [][]byte {
+	ret := make([][]byte, n)
+	sliceSize := (len(cs.data) + n - 1) / n
+	for i := 0; i < n - 1; i++ {
+		ret[i] = Slice{
+			cs.id,
+			uint32(i),
+			uint32(n),
+			cs.codec,
+			cs.data[i*sliceSize:(i+1)*sliceSize],
+		}.encode()
+	}
+	ret[n-1] = Slice{
+		cs.id,
+		uint32(n-1),
+		uint32(n),
+		cs.codec,
+		cs.data[(n-1)*sliceSize:],
+	}.encode()
+	return ret
+}
+
+type Slice struct {
+	cid uint32
+	sid uint32
+	stotal uint32
+	codec string
+	data []uint8
+}
+
+func (s Slice) encode() []byte {
+	ret := make([]byte, 16)
+	binary.BigEndian.PutUint32(ret[4:], s.cid)
+	binary.BigEndian.PutUint32(ret[8:], s.sid)
+	binary.BigEndian.PutUint32(ret[12:], s.stotal)
+	ret = append(ret, []byte(s.codec)...)
+	binary.BigEndian.PutUint32(ret, uint32(len(ret)))
+	ret = append(ret, s.data...)
+	return ret
+}
+
 type ChunkBuffer struct {
 	buffer []Chunk
 	stream *Stream
@@ -87,6 +137,24 @@ type ChunkBuffer struct {
 
 func (cb *ChunkBuffer) onSliceRemove(cs Chunk) {
 	//debug("broadcast")
+}
+
+var ChunkTranport = func(conn *Node, cs Chunk) {
+	select {
+	case conn.ch <- cs.encode():
+	default:
+	}
+}
+
+// TODO: fairly transport
+var SliceTransport = func(conn *Node, cs Chunk) {
+	buffer := cs.split(4)
+	for i := 0; i < 4; i++ {
+		select {
+		case conn.ch <- buffer[i]:
+		default:
+		}
+	}
 }
 
 func (cb *ChunkBuffer) push(cs Chunk) {
@@ -99,10 +167,11 @@ func (cb *ChunkBuffer) push(cs Chunk) {
 		cb.buffer = cb.buffer[1:]
 	}
 
-	cb.stream.iterateConn(func(conn *Node) {
-		select {
-		case conn.ch <- cs.encode():
-		default:
+	cb.stream.iterateConn(func (conn *Node) {
+		if TRANSPORT == "chunk" {
+			ChunkTranport(conn, cs)
+		} else {
+			SliceTransport(conn, cs)
 		}
 	})
 }
@@ -135,17 +204,8 @@ func StreamHandler(path []string, w http.ResponseWriter, r *http.Request) {
 		ch:     make(chan []byte, 10),
 	}
 
-	buff := make([]byte, 4)
-	buff = append(buff, []byte(stream.track[0].codec)...)
-	binary.BigEndian.PutUint32(buff, uint32(len(buff)))
-	buff = append(buff, stream.track[0].initChunk...)
-	conn.WriteMessage(websocket.BinaryMessage, buff)
-
-	buff = make([]byte, 4)
-	buff = append(buff, []byte(stream.track[1].codec)...)
-	binary.BigEndian.PutUint32(buff, uint32(len(buff)))
-	buff = append(buff, stream.track[1].initChunk...)
-	conn.WriteMessage(websocket.BinaryMessage, buff)
+	conn.WriteMessage(websocket.BinaryMessage, stream.track[0].encodeInitMsg())
+	conn.WriteMessage(websocket.BinaryMessage, stream.track[1].encodeInitMsg())
 
 	//fastload
 	go stream.track[1].buffer.fastload(node)
