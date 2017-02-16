@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Client Test</title>
+</head>
+<body>
+<video id="v" controls autoplay></video>
+<br/>
+<script src="../bigendian.js"></script>
+<script src="../bufferqueue.js"></script>
+<script src="../restructor.js"></script>
+<script src="../mse.js"></script>
+<script src="../input.js"></script>
+<script src="../transaction.js"></script>
+<script src="../conn.js"></script>
+<script src="../client.js"></script>
+<script>
+    var v = document.getElementById("v");
+    new Client({videoElement: v});
+    oldlog = console.log;
+    console.log = function(e) {
+        document.body.innerHTML += ("<b>" + new Date().toDateString() + ":</b>" + JSON.stringify(e)+"<br/>");
+        oldlog(e);
+    };
+    LocalClient.connect();
+    LocalClient.onready = function() {
+        LocalClient.find();
+    }
+</script>
+</body>
+</html>

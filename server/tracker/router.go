@@ -20,7 +20,13 @@ func (router Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "stream":
 		StreamHandler(path, w, r)
 		return
+	case "master":
+		MasterHandler(path, w, r)
+		return
+	case "client":
+		ClientHandler(path, w, r)
+		return
 	}
 
-	w.WriteHeader(404);
+	w.WriteHeader(404)
 }

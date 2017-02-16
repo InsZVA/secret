@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	CACHED_LENGTH = 0 // same as client
+	CACHED_LENGTH = 2 // same as client
 	TRANSPORT = "chunk"
 )
 
@@ -185,6 +185,29 @@ func (cb *ChunkBuffer) fastload(conn *Node) {
 	}
 }
 
+func (s *Stream) fastload(conn *Node) {
+	s.track[0].buffer.lock.RLock()
+	s.track[1].buffer.lock.RLock()
+	defer s.track[0].buffer.lock.RUnlock()
+	defer s.track[1].buffer.lock.RUnlock()
+	min := len(s.track[0].buffer.buffer)
+	max := &s.track[1]
+	if len(s.track[1].buffer.buffer) < min {
+		min = len(s.track[1].buffer.buffer)
+		max = &s.track[0]
+	}
+	for i := 0; i < min; i++ {
+		cs := s.track[0].buffer.buffer[i]
+		conn.ch <- cs.encode()
+		cs = s.track[1].buffer.buffer[i]
+		conn.ch <- cs.encode()
+	}
+	for i := min; i < len(max.buffer.buffer); i++ {
+		cs := max.buffer.buffer[i]
+		conn.ch <- cs.encode()
+	}
+}
+
 func StreamHandler(path []string, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -208,8 +231,7 @@ func StreamHandler(path []string, w http.ResponseWriter, r *http.Request) {
 	conn.WriteMessage(websocket.BinaryMessage, stream.track[1].encodeInitMsg())
 
 	//fastload
-	go stream.track[1].buffer.fastload(node)
-	stream.track[0].buffer.fastload(node)
+	stream.fastload(node)
 
 	stream.hangConn(node)
 	defer stream.releaseConn(node)

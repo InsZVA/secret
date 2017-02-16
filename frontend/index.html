@@ -23,7 +23,7 @@
             fr.onloadend = function(e) {
                 var data = new Uint8Array(e.target.result);
                 if (!init) {
-                    var mimeType = 'video/webm; codecs="vp9"';
+                    var mimeType = 'video/webm; codecs="vp8, vorbis"';
                     sourceBuffer = ms.addSourceBuffer(mimeType);
                     init = true;
                 }

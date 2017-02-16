@@ -2,39 +2,47 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSE with Restructor Test</title>
+    <title>MSE with buffer Test</title>
 </head>
 <body>
-<p>请将服务器配置成以slice为单位传输，以及没有缓存。例如：</p>
+<p>请将服务器配置成以chunk为单位传输，以及有缓存。例如：</p>
 <pre>
 {
-    "transport": "slice",
-    "cacheLength": 0
+    "transport": "chunk",
+    "cacheLength": > 4
 }
 </pre>
 
-<video id="v" autoplay></video>
+<video id="v" autoplay controls></video>
 <script src="../bigendian.js"></script>
 <script src="../restructor.js"></script>
+<script src="../bufferqueue.js"></script>
 <script src="../mse.js"></script>
 
 <script>
     var v = document.getElementById("v");
     var mse;
-    var ws = new WebSocket("ws://115.159.227.38:8888/stream/test");
+    var ws = new WebSocket("ws://127.0.0.1:8888/stream/test");
     ws.binaryType = 'arraybuffer';
     var inited = 0;
     var initmsg = [];
-    var restructor = [];
-    restructor[0] = new Restructor();
-    restructor[1] = new Restructor();
-    restructor[0].onchunk = function(chunk) {
+    var bufferqueue = [];
+    bufferqueue[0] = new BufferQueue(4);
+    bufferqueue[1] = new BufferQueue(4);
+    bufferqueue[0].onstatechange = function(state) {
+        console.log(state);
+    };
+    bufferqueue[1].onstatechange = function(state) {
+        console.log(state);
+    };
+    bufferqueue[0].onchunkready = function(chunk) {
+        console.log("sync");
         mse.syncChunk(0, chunk);
     };
-    restructor[1].onchunk = function(chunk) {
+    bufferqueue[1].onchunkready = function(chunk) {
+        console.log("sync");
         mse.syncChunk(1, chunk);
     };
-
     ws.onmessage = function(e) {
         // struct chunk {
         //     uint32_t offset;
@@ -58,18 +66,15 @@
 
         data = new Uint8Array(e.data);
         offset = bigendian.readUint32(data);
-        var slice = new Slice(
+        var chunk = new Chunk(
             bigendian.readUint32(data.slice(4)),
-            bigendian.readUint32(data.slice(8)),
-            bigendian.readUint32(data.slice(12)),
             new Uint8Array(data.slice((offset)))
         );
-        console.log(slice);
-        var codec = new TextDecoder("utf-8").decode(data.slice(16, offset));
+        var codec = new TextDecoder("utf-8").decode(data.slice(8, offset));
         if (codec == "vp9")
-            restructor[0].pushSlice(slice);
+            bufferqueue[0].pushChunk(chunk);
         else
-            restructor[1].pushSlice(slice);
+            bufferqueue[1].pushChunk(chunk);
     };
 
 </script>

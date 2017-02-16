@@ -13,13 +13,14 @@
 }
 </pre>
 
-<video id="v" autoplay></video>
+<video id="v" autoplay controls></video>
 <script src="../bigendian.js"></script>
 <script src="../restructor.js"></script>
 <script src="../mse.js"></script>
 
 <script>
     var v = document.getElementById("v");
+
     var mse;
     var ws = new WebSocket("ws://127.0.0.1:8888/stream/test");
     ws.binaryType = 'arraybuffer';

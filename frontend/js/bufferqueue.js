@@ -5,7 +5,7 @@
 function BufferQueue(length) {
     this._state = "fastload";
     this.length = length || 2;
-    this._queue = [];
+    this._handlerqueue = [];
     this.onstatechange = null;
     /**
      * when chunk is ready to play it is called
@@ -22,8 +22,11 @@ function BufferQueue(length) {
 BufferQueue.prototype.pushChunk = function(chunk) {
     this._enqueue(chunk);
     if (this._state == "fastload") {
-        if (this._iscontinuous())
+        if (this._iscontinuous() && this._isfull()) {
+            for (var i = 0; i < this._handlerqueue.length; i++)
+                this.onchunkready(this._handlerqueue[i]);
             this._setState("buffered");
+        }
     } else {
         if (!this._iscontinuous())
             this._setState("fastload");
@@ -34,21 +37,29 @@ BufferQueue.prototype.pushChunk = function(chunk) {
     }
 };
 
+BufferQueue.prototype._isfull = function() {
+    return this._handlerqueue.length >= this.length;
+};
+
 /**
  * enqueue a chunk and remove the last if full
  * @param {Chunk} chunk
  */
 BufferQueue.prototype._enqueue = function(chunk) {
+    console.log("enqueue");
     // usually length is very small, so I don't care how to implement
     var i;
-    for (i = 0; i < this._queue.length; i++) {
-        if (this._queue[i].id > chunk.id) break;
+    for (i = 0; i < this._handlerqueue.length; i++) {
+        if (this._handlerqueue[i].id > chunk.id) break;
     }
-    this._queue = this._queue.slice(0, i).concat(
-        [chunk].concat(this._queue.slice(i))
+    if (i > 0 && this._handlerqueue[i-1].id == chunk.id)
+        return;
+
+    this._handlerqueue = this._handlerqueue.slice(0, i).concat(
+        [chunk].concat(this._handlerqueue.slice(i))
     );
-    if (this._queue.length > this.length) {
-        this._queue = this._queue.slice(1);
+    if (this._handlerqueue.length > this.length) {
+        this._handlerqueue = this._handlerqueue.slice(1);
     }
 };
 
@@ -58,8 +69,8 @@ BufferQueue.prototype._enqueue = function(chunk) {
  */
 BufferQueue.prototype._iscontinuous = function() {
     // usually length is very small, so I don't care how to implement
-    for (var i = 0; i < this._queue.length - 1; i++) {
-        if (this._queue[i].id + 1 != this._queue[i+1].id) return false;
+    for (var i = 0; i < this._handlerqueue.length - 1; i++) {
+        if (this._handlerqueue[i].id + 1 != this._handlerqueue[i+1].id) return false;
     }
     return true;
 };

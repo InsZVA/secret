@@ -7,7 +7,7 @@ window.bigendian = new _bigendian();
 
 /**
  * read a uint32
- * @param {Uint8Array} data
+ * @param {ArrayBuffer|Uint8Array} data
  * @returns {number}
  */
 _bigendian.prototype.readUint32 = function(data) {

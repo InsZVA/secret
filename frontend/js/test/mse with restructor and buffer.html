@@ -22,7 +22,7 @@
 <script>
     var v = document.getElementById("v");
     var mse;
-    var ws = new WebSocket("ws://127.0.0.1:8888/stream/test");
+    var ws = new WebSocket("ws://115.159.227.38:8888/stream/test");
     ws.binaryType = 'arraybuffer';
     var inited = 0;
     var initmsg = [];
@@ -35,8 +35,14 @@
     bufferqueue[0].onchunkready = function(chunk) {
         mse.syncChunk(0, chunk);
     };
+    bufferqueue[0].onstatechange = function(state) {
+        console.log("video buffer state:", state);
+    };
     bufferqueue[1].onchunkready = function (chunk) {
         mse.syncChunk(1, chunk);
+    };
+    bufferqueue[1].onstatechange = function(state) {
+        console.log("audio buffer state:", state);
     };
     restructor[0].onchunk = function(chunk) {
         bufferqueue[0].pushChunk(chunk);

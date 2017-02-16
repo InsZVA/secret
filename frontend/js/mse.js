@@ -22,9 +22,9 @@ function InitMsg(raw) {
 InitMsg.prototype.fullmimie = function(short) {
     switch (short) {
         case "vp9":
-            return "video/webm; codecs=\"vp9\"";
+            return "video/webm; codec=\"vp9\"";
         case "vorbis":
-            return "audio/webm; codecs=\"vorbis\"";
+            return "audio/webm; codec=\"vorbis\"";
     }
     return "unsupport";
 };
@@ -38,14 +38,17 @@ InitMsg.prototype.fullmimie = function(short) {
  */
 function MSE(v, vinit, ainit) {
     if (!window.URL) throw "This browser dosn't support URL";
-    this._ms = new MediaSource();
     this._v = v;
     this._sb = [];
     this._sbqueue = [];
     this._vinit = vinit;
     this._ainit = ainit;
-    this._ms.addEventListener('sourceopen', this.init.bind(this));
+    this._ms = new MediaSource();
     this._v.src = URL.createObjectURL(this._ms);
+    this._ms.addEventListener('sourceopen', this.init.bind(this));
+    this._state = "close";
+    // when it is not inited, the buffer will buffer the "sync"
+    this._buffer = [];
 }
 
 /**
@@ -61,6 +64,14 @@ MSE.prototype.init = function() {
     this._sb[1].appendBuffer(this._ainit.data);
     this._sb[0].addEventListener('updateend', this.updatelistener.call(this, 0));
     this._sb[1].addEventListener('updateend', this.updatelistener.call(this, 1));
+
+    //sync the buffer
+    this._state = "open";
+    for (var i = 0; i < 2; i++) {
+        for (var j = 0; j < this._buffer[i].length; j++) {
+            this.syncChunk(i, this._buffer[i][j]);
+        }
+    }
 };
 
 /**
@@ -70,6 +81,7 @@ MSE.prototype.init = function() {
  */
 MSE.prototype.updatelistener = function(index) {
     return function() {
+        console.log("updated");
         if (this._sbqueue[index].length > 0) {
             this._sb[index].appendBuffer(this._sbqueue[index][0]);
             this._sbqueue[index] = this._sbqueue[index].slice(1);
@@ -78,6 +90,12 @@ MSE.prototype.updatelistener = function(index) {
         if (this._sb[index].buffered.length > 0 &&
             this._sb[index].buffered.start(0) > this._v.currentTime)
             this._v.currentTime = this._sb[index].buffered.start(0) + 0.05;
+
+
+        if (this._sb[index].buffered.length > 0 &&
+            this._sb[index].buffered.end(0) - this._sb[index].buffered.start(0) > 120)
+            this._sb[index].remove(this._sb[index].buffered.start(0),
+                this._sb[index].buffered.start(0) + 60);
     }.bind(this);
 };
 
@@ -87,14 +105,18 @@ MSE.prototype.updatelistener = function(index) {
  * @param {Chunk} chunk
  */
 MSE.prototype.syncChunk = function(index, chunk) {
-    index = parseInt(index);
-    if (this._sb[index].updating)
-        this._sbqueue.push(chunk.data);
-    else
-        this._sb[index].appendBuffer(chunk.data);
+    if (this._state != "open") {
+        if (!this._buffer[index]) this._buffer[index] = [];
+        this._buffer[index].push(chunk);
+        return;
+    }
 
-    if (this._sb[index].buffered.length > 0 &&
-        this._sb[index].buffered.end(0) - this._sb[index].buffered.start(0) > 120)
-        this._sb[index].remove(this._sb[index].buffered.start(0),
-            this._sb[index].buffered.start(0) + 60);
+    index = parseInt(index);
+    if (this._sb[index].updating) {
+        this._sbqueue[index].push(chunk.data);
+    }
+    else {
+        this._sb[index].appendBuffer(chunk.data);
+    }
+
 };
