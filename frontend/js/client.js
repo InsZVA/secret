@@ -33,7 +33,7 @@ function Client(config) {
 
     this.bufferqueue = [new BufferQueue(this.bufferLength),
         new BufferQueue(this.bufferLength)];
-    this.mse = null;
+    this.mse = undefined;
     this.inited = 0;
     this.initmsg = [];
 
@@ -104,18 +104,20 @@ Client.prototype.onmastermessage = function(e) {
             console.log(data);
             break;
         case "peek":
-            console.log(data);
+            /*console.log(data);
             var peeked = data.peek;
             var inputs = LocalClient.getReusedInputs(peeked.length);
             for (var i = 0; i < peeked.length; i++) {
-                inputs[i].dial(this.masterConn, peeked[i]);
-            }
+                inputs[i].dial(LocalClient.masterConn, peeked[i]);
+            }*/
+            LocalClient.getReusedInputs(1)[0].dial(LocalClient.masterConn, "server");
+
             //TODO
     }
 };
 
 Client.prototype.onerrormessage = function(e) {
-
+    throw e;
 };
 
 Client.prototype.connect = function() {

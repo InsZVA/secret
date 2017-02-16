@@ -126,7 +126,7 @@ Input.prototype._transfer = function(e) {
 };
 
 Input.prototype._timeout = function() {
-
+    console.log("//TODO: timeout")
 };
 
 Input.prototype._bind = function() {

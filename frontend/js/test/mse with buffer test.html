@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MSE with buffer Test II</title>
+</head>
+<body>
+<p>请将服务器配置成以chunk为单位传输，以及有缓存。例如：</p>
+<pre>
+{
+    "transport": "chunk",
+    "cacheLength": > 4
+}
+</pre>
+
+<video id="v" autoplay controls></video>
+<script src="../bigendian.js"></script>
+<script src="../client.js"></script>
+<script src="../bufferqueue.js"></script>
+<script src="../restructor.js"></script>
+<script src="../mse.js"></script>
+<script src="../input.js"></script>
+<script src="../transaction.js"></script>
+<script src="../conn.js"></script>
+
+<script>
+    var v = document.getElementById("v");
+    new Client({videoElement: v});
+    LocalClient.connect();
+    LocalClient.onready = function() {
+        /*var ws = new WebSocket("ws://127.0.0.1:8888/stream/test");
+         ws.binaryType = 'arraybuffer';
+         LocalClient.bufferqueue[0].onstatechange = function(state) {
+         console.log(state);
+         };
+         LocalClient.bufferqueue[1].onstatechange = function(state) {
+         console.log(state);
+         };
+         LocalClient.bufferqueue[0].onchunkready = function(chunk) {
+         console.log("sync");
+         LocalClient.mse.syncChunk(0, chunk);
+         };
+         LocalClient.bufferqueue[1].onchunkready = function(chunk) {
+         console.log("sync");
+         LocalClient.mse.syncChunk(1, chunk);
+         };
+         ws.onmessage = function(e) {
+         // struct chunk {
+         //     uint32_t offset;
+         //     uint32_t id;
+         //     char[]   codec;
+         //     ...
+         //     uint8_t  videostream;
+         // }
+
+         var data, offset;
+         if (LocalClient.inited < 2) {
+         data = new Uint8Array(e.data);
+         LocalClient.initmsg[LocalClient.inited] = new InitMsg(data);
+         LocalClient.inited++;
+         console.log("init");
+         if (LocalClient.inited == 2) {
+         LocalClient.mse = new MSE(LocalClient.videoElement,
+         LocalClient.initmsg[0], LocalClient.initmsg[1]);
+         }
+         return
+         }
+
+         data = new Uint8Array(e.data);
+         offset = bigendian.readUint32(data);
+         var chunk = new Chunk(
+         bigendian.readUint32(data.slice(4)),
+         new Uint8Array(data.slice((offset)))
+         );
+         var codec = new TextDecoder("utf-8").decode(data.slice(8, offset));
+         if (codec == "vp9")
+         LocalClient.bufferqueue[0].pushChunk(chunk);
+         else
+         LocalClient.bufferqueue[1].pushChunk(chunk);
+         };*/
+        var data = {"peek":["server"],"type":"peek"};
+        var peeked = data.peek;
+        var inputs = LocalClient.getReusedInputs(peeked.length);
+        for (var i = 0; i < peeked.length; i++) {
+            inputs[i].dial(LocalClient.masterConn, peeked[i]);
+        }
+    };
+
+</script>
+</body>
+</html>

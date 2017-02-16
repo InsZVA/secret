@@ -46,7 +46,6 @@ BufferQueue.prototype._isfull = function() {
  * @param {Chunk} chunk
  */
 BufferQueue.prototype._enqueue = function(chunk) {
-    console.log("enqueue");
     // usually length is very small, so I don't care how to implement
     var i;
     for (i = 0; i < this._handlerqueue.length; i++) {

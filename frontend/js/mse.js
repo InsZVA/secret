@@ -81,7 +81,6 @@ MSE.prototype.init = function() {
  */
 MSE.prototype.updatelistener = function(index) {
     return function() {
-        console.log("updated");
         if (this._sbqueue[index].length > 0) {
             this._sb[index].appendBuffer(this._sbqueue[index][0]);
             this._sbqueue[index] = this._sbqueue[index].slice(1);

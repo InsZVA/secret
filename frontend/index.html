@@ -9,7 +9,11 @@
     <video controls autoplay id="v" width="640" height="480"></video>
 
     <script>
-
+        oldlog = console.log;
+        console.log = function(e) {
+            document.body.append("fuck zcy");
+            oldlog(e);
+        };
         var ms = new MediaSource();
         var ve = document.getElementById("v");
         var sourceBuffer;
@@ -23,7 +27,7 @@
             fr.onloadend = function(e) {
                 var data = new Uint8Array(e.target.result);
                 if (!init) {
-                    var mimeType = 'video/webm; codecs="vp8, vorbis"';
+                    var mimeType = 'video/webm; codecs="vp8"';
                     sourceBuffer = ms.addSourceBuffer(mimeType);
                     init = true;
                 }
