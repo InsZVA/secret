@@ -246,15 +246,19 @@ func (s *Stream) fastload(conn *Node) {
 func StreamHandler(path []string, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		w.WriteHeader(500); return
+		conn.Close()
+		/*w.WriteHeader(500);*/ return
 	}
 	if len(path) < 2 {
-		w.WriteHeader(403); return
+		conn.Close()
+		/*w.WriteHeader(403);*/ return
 	}
 	sid := path[1]
 	stream := streamMap.Get(sid)
 	if stream == nil {
-		w.WriteHeader(404); return
+		conn.Close() // if not have this clause
+		// a "response.WriteHeader on hijacked connection" will be thrown
+		/*w.WriteHeader(404);*/ return
 	}
 
 	node := &Node{

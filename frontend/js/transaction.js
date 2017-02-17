@@ -8,7 +8,7 @@
  * @param {string} msg - the description of transaction
  * @constructor
  */
-function Trasaction(dst, msg) {
+function Transaction(dst, msg) {
     this.dst = dst;
     this.msg = msg;
 }

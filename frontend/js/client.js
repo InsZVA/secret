@@ -4,7 +4,12 @@
 
 function Client(config) {
     if (!config) config = {};
+    /**
+     * close --> ready --> transaction
+     * @type {string}
+     */
     this.state = "close";
+    this.transactions = [];
 
     this.onready = null;
     this.inputs = null;
@@ -109,8 +114,50 @@ Client.prototype.onmastermessage = function(e) {
             for (var i = 0; i < peeked.length; i++) {
                 inputs[i].dial(LocalClient.masterConn, peeked[i]);
             }
+            break;
+        case "transaction":
+            if (data.cmd == "end")
+                this.endtransaction();
+            else if (data.cmd == "start")
+                this.starttransaction(data.dst, data.msg);
+    }
+};
 
-            //TODO
+/**
+ * end transaction
+ */
+Client.prototype.endtransaction = function() {
+    //TODO
+    if (this.state == "transaction") {
+        if (!this.transactions || this.transactions.length == 0)
+            throw "Have no transaction";
+        // TODO: produce current transaction
+        this.transactions = [];
+        this.state = "ready";
+    } else {
+        throw "Not in transaction"
+    }
+};
+
+/**
+ * start transaction
+ * @param {string} dst
+ * @param {string} msg
+ */
+Client.prototype.starttransaction = function(dst, msg) {
+    //TODO
+    if (this.state != "transaction") {
+        if (!this.transactions)
+            this.transactions = [];
+        if (this.transactions.length != 0) {
+            // TODO
+            throw "Already have transaction!";
+        } else {
+            this.transactions.push(new Transaction(dst, msg));
+            this.state = "transaction";
+        }
+    } else {
+        throw "Already in transaction!"
     }
 };
 
@@ -132,7 +179,6 @@ Client.prototype.find = function() {
             this.inputs[this.runningInput()].remote != "server")
         {
             this.masterConn.send({type: "find"});
-            this.state = "transaction";
         }
     }
 };

@@ -102,7 +102,7 @@ Input.prototype.dial = function(masterConn, clientId) {
 
 Input.prototype._start = function(conn) {
     this.state = "connected";
-    setTimeout(this._timeout, STATISTICS_OUT_TIME);
+    setTimeout(this._timeout.bind(this), STATISTICS_OUT_TIME);
 };
 
 Input.prototype._transfer = function(e) {

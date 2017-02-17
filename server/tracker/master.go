@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 	"encoding/hex"
 	"strconv"
+	"sort"
 )
 
 const (
@@ -309,10 +310,9 @@ func (cli *Client) TransactionBegin(dst *Client, msg string) bool {
 	}
 
 	if cli != &server {
-		data := make(map[string]interface{})
-		data["type"] = "transaction"
-		data["msg"] = msg
-		err := cli.conn.WriteJSON(data)
+		transactionStartMsg["msg"] = msg
+		transactionStartMsg["dst"] = dst.id
+		err := cli.conn.WriteJSON(transactionStartMsg)
 		if err != nil {
 			return false
 		}
@@ -342,14 +342,28 @@ func (t *Transaction) End() {
 	}
 
 	if t.a.transaction == nil || len(t.a.transaction) == 0 {
-		t.a.state = CLIENT_STATE_READY
+		if t.a != &server {
+			t.a.TransactionEnd()
+		}
+	}
+	if t.b.transaction == nil || len(t.b.transaction) == 0 {
+		if t.b != &server {
+			t.b.TransactionEnd()
+		}
 	}
 }
 
-func (cli *Client) SetTransaction() {
-	if cli != &server {
-		cli.state = CLIENT_STATE_IN_TRASACTION
-	}
+var (
+	transactionStartMsg = make(map[string]interface{})
+	transactionEndMsg = make(map[string]interface{})
+)
+
+func init() {
+	transactionStartMsg["type"] = "transaction"
+	transactionStartMsg["cmd"] = "start"
+
+	transactionEndMsg["type"] = "transaction"
+	transactionEndMsg["cmd"] = "end"
 }
 
 /**
@@ -359,6 +373,9 @@ func (cli *Client) SetTransaction() {
 func (cli *Client) TransactionEnd() {
 	if cli != &server {
 		cli.state = CLIENT_STATE_READY
+		if cli.conn != nil {
+			cli.conn.WriteJSON(transactionEndMsg)
+		}
 	}
 }
 
@@ -382,13 +399,40 @@ func (cli *Client) FindTransactions(dst *Client) []int {
 	return ret
 }
 
+// TODO: every client's operation must be in its own thread to avoid lock
+// TODO: setState notification
+func (cli *Client) EndTransactions(ids []int) {
+	left := []Transaction{}
+	todel := []Transaction{}
+	sort.Ints(ids)
+	p, i := 0, 0
+	for p < len(ids) {
+		if i >= len(cli.transaction) {
+			break
+		}
+		if i == ids[p] {
+			todel = append(todel, cli.transaction[i])
+			i++
+			p++
+		} else if ids[p] > i {
+			left = append(left, cli.transaction[i])
+			i++
+		} else {
+			//impossible
+			panic("impossible")
+		}
+	}
+	for _, t := range todel {
+		t.End()
+	}
+	cli.transaction = left // not necessary
+}
+
 func (cli *Client) Bind(dst *Client, reserved bool) {
 	cli.SetReadyInput(dst, reserved)
 	dst.SetReadyOutput(cli, reserved)
 	t := cli.FindTransactions(dst)
-	for i := 0; i < len(t); i++ {
-		cli.transaction[i].End()
-	}
+	cli.EndTransactions(t)
 }
 
 // create or get a ready input and set its output
@@ -480,7 +524,6 @@ func (cm *ClientMap) PeekLevel(l int) []*Client {
 		if c.Level() - l < 2 && c.Level() - 1 > -2 &&
 			c.state != CLIENT_STATE_IN_TRASACTION {
 			if c.OutputAvailable() || i < 2 {
-				c.state = CLIENT_STATE_IN_TRASACTION
 				peeked = append(peeked, c)
 			}
 			if len(peeked) > 5 {
@@ -492,7 +535,6 @@ func (cm *ClientMap) PeekLevel(l int) []*Client {
 }
 
 func (cli *Client) Find() []*Client {
-	cli.state = CLIENT_STATE_IN_TRASACTION
 	level := cli.Level()
 	if level < 1 {
 		if clientMap.n < SERVER_OUTPUT_CAPABILITY {
@@ -503,14 +545,93 @@ func (cli *Client) Find() []*Client {
 	return clientMap.PeekLevel(level)
 }
 
-func (cli *Client) Close() {
-	if cli.transaction == nil { return }
-	if cli.transaction != nil && len(cli.transaction) == 0 {
-		cli.transaction = nil
-		return
+// Free some output of specify state
+// all outputs of the same state is the same
+// param: table[state] = num
+func (cli *Client) FreeOutputs(table []int) {
+	for i := 0; i < len(cli.outputs); i++ {
+		for state := range table {
+			if table[state] > 0 && cli.outputs[i].state == state {
+				cli.outputs[i].state = OUTPUT_STATE_READY
+				table[state]--
+			}
+		}
 	}
-	cli.transaction[0].End()
-	cli.Close()
+}
+
+func (cli *Client) FreeOutput(state int) {
+	for i := 0; i < len(cli.outputs); i++ {
+		if cli.outputs[i].state == state {
+			cli.outputs[i].state = OUTPUT_STATE_READY
+			cli.outputs[i].input = nil
+			return
+		}
+	}
+}
+
+func state_in2out(in int) int {
+	switch in {
+	case INPUT_STATE_RESERVED:
+		return OUTPUT_STATE_RESERVED
+	case INPUT_STATE_RUNNING:
+		return OUTPUT_STATE_RUNNING
+	}
+	return 0
+}
+
+func state_out2in(out int) int {
+	switch out {
+	case OUTPUT_STATE_RUNNING:
+		return INPUT_STATE_RUNNING
+	case OUTPUT_STATE_RESERVED:
+		return INPUT_STATE_RESERVED
+	}
+	return 0
+}
+
+// Release all inputs of a client
+func (cli *Client) ReleaseInputs() {
+	for i := 0; i < len(cli.inputs); i++ {
+		if cli.inputs[i].state == INPUT_STATE_RUNNING ||
+			cli.inputs[i].state == INPUT_STATE_RESERVED {
+			cli.inputs[i].output.FreeOutput(state_in2out(cli.inputs[i].state))
+		}
+	}
+}
+
+// Close a input of a specify state
+func (cli *Client) CloseInput(state int) {
+	for i := 0; i < len(cli.inputs); i++ {
+		if cli.inputs[i].state == state {
+			cli.inputs[i].state = INPUT_STATE_CLOSE
+			cli.inputs[i].output = nil
+			return
+		}
+	}
+}
+
+// Close all outputs of a client
+func (cli *Client) CloseOutputs() {
+	for i := 0; i < len(cli.outputs); i++ {
+		if cli.outputs[i].state == OUTPUT_STATE_RESERVED ||
+			cli.outputs[i].state == OUTPUT_STATE_RUNNING {
+			cli.outputs[i].input.CloseInput(state_out2in(cli.outputs[i].state))
+		}
+	}
+}
+
+func (cli *Client) Close() {
+	ids := []int{}
+	if cli.transaction != nil {
+		for i := 0; i < len(cli.transaction); i++ {
+			ids = append(ids, i)
+		}
+	}
+	cli.EndTransactions(ids)
+
+	// Release Input & Output
+	cli.CloseOutputs()
+	cli.ReleaseInputs()
 }
 
 func MasterHandler(path []string, w http.ResponseWriter, r *http.Request) {
