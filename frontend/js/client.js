@@ -11,6 +11,7 @@ function Client(config) {
 
     // Config
     this.masterConn = new ConnMaster((config.master || 'ws://127.0.0.1:8888/master'));
+    this.streamAddr = config.streamAddr || 'ws://127.0.0.1:8888/stream/test';
     this.transmode = config.transmode || "chunk";
     this.rtcConfig = config.rtcConfig || {
             iceServers: [{

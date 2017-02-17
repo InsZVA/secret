@@ -59,7 +59,7 @@ Input.prototype.dial = function(masterConn, clientId) {
         this.remote = "server";
         this._masterConn = masterConn;
         this.conn = masterConn;
-        this.ws = new WebSocket("ws://127.0.0.1:8888/stream/test");
+        this.ws = new WebSocket(LocalClient.streamAddr);
         this.ws.binaryType = 'arraybuffer';
         this.ws.onopen = function() {
             this._start(this.ws);
