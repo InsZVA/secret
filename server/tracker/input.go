@@ -69,6 +69,9 @@ func InputHandler(path []string, w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				w.WriteHeader(403); return
 			}
+			if !stream.sw.Inited() {
+				stream.sw.Reset()
+			}
 			w.WriteHeader(200); return
 		}
 		if fts[0] == "a" {
@@ -77,6 +80,9 @@ func InputHandler(path []string, w http.ResponseWriter, r *http.Request) {
 			debug("Audio " + sid + " header:" + points[0])
 			if err != nil {
 				w.WriteHeader(403); return
+			}
+			if !stream.sw.Inited() {
+				stream.sw.Reset()
 			}
 			w.WriteHeader(200); return
 		}
@@ -106,15 +112,19 @@ func InputHandler(path []string, w http.ResponseWriter, r *http.Request) {
 			data: buff,
 		}
 		if fts[0] == "v" {
+			stream.sw.AWait()
 			ck.codec = stream.track[0].codec
 			stream.track[0].buffer.push(ck)
 			debug("Video " + sid + " buffered")
+			stream.sw.ARelease()
 			w.WriteHeader(200); return
 		}
 		if fts[0] == "a" {
+			stream.sw.BWait()
 			ck.codec = stream.track[1].codec
 			stream.track[1].buffer.push(ck)
 			debug("Audio " + sid + " buffered")
+			stream.sw.BRelease()
 			w.WriteHeader(200); return
 		}
 		w.WriteHeader(403); return

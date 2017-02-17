@@ -37,6 +37,7 @@ func (cm *ClientMap) Set(k string, v *Client) {
 }
 
 func (cm *ClientMap) Get(k string) *Client {
+	if k == "server" { return &server }
 	cm.lock.RLock()
 	defer cm.lock.RUnlock()
 	return cm.m[k]
@@ -157,7 +158,7 @@ type Input struct {
 	cli *Client
 	state int
 	level int
-	output *Output
+	output *Client
 }
 
 const (
@@ -175,7 +176,7 @@ const (
 type Output struct {
 	cli *Client
 	state int
-	input *Input
+	input *Client
 }
 
 // only for server
@@ -232,7 +233,7 @@ func (cli *Client) InputCap() int {
 	return ret
 }
 
-func (cli *Client) Source() *Output {
+func (cli *Client) Source() *Client {
 	if cli.inputs == nil {
 		return nil
 	}
@@ -290,6 +291,7 @@ func (cli *Client) Output() int {
 	server -> client
  */
 func (cli *Client) TransactionBegin(dst *Client, msg string) bool {
+
 	if cli.transaction == nil {
 		cli.transaction = []Transaction{
 			{
@@ -306,17 +308,20 @@ func (cli *Client) TransactionBegin(dst *Client, msg string) bool {
 		})
 	}
 
-	data := make(map[string]interface{})
-	data["type"] = "transaction"
-	data["msg"] = msg
-	err := cli.conn.WriteJSON(data)
-	if err != nil {
-		return false
+	if cli != &server {
+		data := make(map[string]interface{})
+		data["type"] = "transaction"
+		data["msg"] = msg
+		err := cli.conn.WriteJSON(data)
+		if err != nil {
+			return false
+		}
+		cli.state = CLIENT_STATE_IN_TRASACTION
 	}
-	cli.state = CLIENT_STATE_IN_TRASACTION
 	return true
 }
 
+// end both peers' transaction
 func (t *Transaction) End() {
 	i := 0
 	if t.a.transaction != nil {
@@ -329,11 +334,21 @@ func (t *Transaction) End() {
 	}
 	if t.b.transaction != nil {
 		for i = 0; i < len(t.b.transaction); i++ {
-			if t.b.transaction[i].a == t.a {
+			if t.b.transaction[i].b == t.a {
 				break
 			}
 		}
 		t.b.transaction = append(t.b.transaction[:i], t.b.transaction[i+1:]...)
+	}
+
+	if t.a.transaction == nil || len(t.a.transaction) == 0 {
+		t.a.state = CLIENT_STATE_READY
+	}
+}
+
+func (cli *Client) SetTransaction() {
+	if cli != &server {
+		cli.state = CLIENT_STATE_IN_TRASACTION
 	}
 }
 
@@ -342,7 +357,9 @@ func (t *Transaction) End() {
 	client -> server
  */
 func (cli *Client) TransactionEnd() {
-	cli.state = CLIENT_STATE_READY
+	if cli != &server {
+		cli.state = CLIENT_STATE_READY
+	}
 }
 
 func (cli *Client) FindTransaction(dst *Client) int {
@@ -355,44 +372,98 @@ func (cli *Client) FindTransaction(dst *Client) int {
 	return -1
 }
 
+func (cli *Client) FindTransactions(dst *Client) []int {
+	ret := []int{}
+	for i := 0; i < len(cli.transaction); i++ {
+		if cli.transaction[i].b == dst {
+			ret = append(ret, i)
+		}
+	}
+	return ret
+}
+
 func (cli *Client) Bind(dst *Client, reserved bool) {
+	cli.SetReadyInput(dst, reserved)
+	dst.SetReadyOutput(cli, reserved)
+	t := cli.FindTransactions(dst)
+	for i := 0; i < len(t); i++ {
+		cli.transaction[i].End()
+	}
+}
+
+// create or get a ready input and set its output
+func (cli *Client) SetReadyInput(dst *Client, reserved bool) {
+	if dst == nil { return }
+	state := INPUT_STATE_RUNNING
+	if reserved { state = INPUT_STATE_RESERVED }
 	if cli.inputs == nil {
-		cli.inputs = []Input{
-			Input{
-				cli:   cli,
-				level: dst.Level() + 1,
-			},
+		cli.inputs = []Input{{
+			cli: cli, state: state,
+			output: dst, level: dst.Level() + 1,
+		}}
+		return
+	}
+
+	for i := 0; i < len(cli.inputs); i++ {
+		if cli.inputs[i].state == INPUT_STATE_CLOSE {
+			cli.inputs[i].state = state
+			cli.inputs[i].output = dst
+			cli.inputs[i].level = dst.Level() + 1
+			return
+		}
+	}
+
+	cli.inputs = append(cli.inputs, Input{
+		cli: cli, state: state,
+		output: dst, level: dst.Level() + 1,
+	})
+}
+
+// create or get a ready output and set its input
+// if dst is nil, this function only ensure a ready output
+func (cli *Client) SetReadyOutput(dst *Client, reserved bool) {
+	state := OUTPUT_STATE_RUNNING
+	if reserved { state = OUTPUT_STATE_RESERVED }
+	if dst == nil { state = OUTPUT_STATE_READY }
+	if cli.outputs == nil {
+		cli.outputs = []Output{{
+			cli: cli, state: state,
+			input: dst,
+		}}
+	} else {
+		closeId := -1
+		for i := 0; i < len(cli.outputs); i++ {
+			if cli.outputs[i].state == OUTPUT_STATE_READY {
+				cli.outputs[i].state = state
+				cli.outputs[i].input = dst
+				return
+			}
+			if cli.outputs[i].state == OUTPUT_STATE_CLOSE {
+				closeId = i
+			}
 		}
 
-		if reserved {
-			cli.inputs[0].state = INPUT_STATE_RESERVED
-			//cli.inputs[0].output
+		//no ready, change closeId to ready
+		if closeId != -1 {
+			cli.outputs[closeId].state = state
+			cli.outputs[closeId].input = dst
+			return
 		}
-	} else {
-		//TODO
+
+		cli.outputs = append(cli.outputs, Output{
+			cli: cli, state: state,
+			input: dst,
+		})
 	}
-	dst.TransactionEnd()
-	cli.TransactionEnd()
 }
 
 func (cli *Client) Evaluate(dst *Client, value bool) {
-	if i := cli.FindTransaction(dst); i != -1 {
-		if value {
-			if cli.outputs == nil {
-				cli.outputs = []Output{
-					{
-						cli: cli,
-						state: OUTPUT_STATE_READY,
-					},
-				}
-			} else {
-				cli.outputs = append(cli.outputs, Output{
-					cli: cli,
-					state: OUTPUT_STATE_READY,
-				})
-			}
+	if value {
+		dst.SetReadyOutput(nil, false)
+	} else {
+		if i := cli.FindTransaction(dst); i != -1 {
+			cli.transaction[i].End()
 		}
-		cli.transaction[i].End()
 	}
 }
 
@@ -497,6 +568,7 @@ func (cli *Client) translateMsg(data map[string]interface{}, conn *websocket.Con
 		ret["peek"] = []string{}
 		for i := 0; i < len(peeked); i++ {
 			cli.TransactionBegin(peeked[i],"bind")
+			peeked[i].TransactionBegin(cli, "peek")
 			ret["peek"] = append(ret["peek"].([]string), peeked[i].id)
 		}
 	case "bind":
@@ -528,5 +600,7 @@ func (cli *Client) translateMsg(data map[string]interface{}, conn *websocket.Con
 		}
 		cli.Evaluate(dst, value != 0)
 	}
-	conn.WriteJSON(ret)
+	if len(ret) != 0 {
+		conn.WriteJSON(ret)
+	}
 }

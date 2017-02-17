@@ -68,6 +68,7 @@ MSE.prototype.init = function() {
     //sync the buffer
     this._state = "open";
     for (var i = 0; i < 2; i++) {
+        if (!this._buffer[i]) continue;
         for (var j = 0; j < this._buffer[i].length; j++) {
             this.syncChunk(i, this._buffer[i][j]);
         }
@@ -89,7 +90,6 @@ MSE.prototype.updatelistener = function(index) {
         if (this._sb[index].buffered.length > 0 &&
             this._sb[index].buffered.start(0) > this._v.currentTime)
             this._v.currentTime = this._sb[index].buffered.start(0) + 0.05;
-
 
         if (this._sb[index].buffered.length > 0 &&
             this._sb[index].buffered.end(0) - this._sb[index].buffered.start(0) > 120)

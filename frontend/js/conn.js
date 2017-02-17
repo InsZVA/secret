@@ -46,6 +46,7 @@ ConnMaster.prototype.dispatchMsg = function(e) {
             return this.onunkownmessage(e);
         return null;
     }
+    console.log(data);
 
     if (data.type && data.type != "forward") {
         return this.onmessage(e);
@@ -60,7 +61,8 @@ ConnMaster.prototype.dispatchMsg = function(e) {
             return null;
         }
     } else {
-        return this.onunkownmessage(e);
+        if (this.onunkownmessage)
+            return this.onunkownmessage(e);
     }
 };
 

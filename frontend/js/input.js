@@ -21,7 +21,7 @@ function Input() {
      * the input state
      * close --beginP2P--> connecting --connected--> transferring --statistics--> [ready] --need--> running/reserved
      *                      |failed|                                |out time|            |not need|
-     *                        close                                  timeout               release
+     *                        close                                  timeout               released
      * @type {string}
      */
     this.state = "close";
@@ -40,6 +40,7 @@ function Input() {
     this.onclose = null;
     this.ontimeout = null;
     this.onrelease = null;
+    this.onready = null;
     /**
      * transferred chunk num
      * @type {number}
@@ -47,10 +48,16 @@ function Input() {
     this.transferred = 0;
 }
 
+/**
+ * Dial a peer/server to get input stream
+ * @param {ConnMaster} masterConn
+ * @param {string} clientId
+ */
 Input.prototype.dial = function(masterConn, clientId) {
     if (this.state != "close") throw "Try to dial using a non-closed input.";
     if (clientId == "server") {
         this.remote = "server";
+        this._masterConn = masterConn;
         this.conn = masterConn;
         this.ws = new WebSocket("ws://127.0.0.1:8888/stream/test");
         this.ws.binaryType = 'arraybuffer';
@@ -66,6 +73,7 @@ Input.prototype.dial = function(masterConn, clientId) {
         }.bind(this);
     } else {
         this.remote = clientId;
+        this._masterConn = masterConn;
         this.conn = masterConn.newClientConn(clientId);
         this.pc = new RTCPeerConnection(LocalClient.rtcConfig);
         pc.createOffer().then(function(offer) {
@@ -93,7 +101,8 @@ Input.prototype.dial = function(masterConn, clientId) {
 };
 
 Input.prototype._start = function(conn) {
-    setTimeout(this._timeout, this._timeout);
+    this.state = "connected";
+    setTimeout(this._timeout, STATISTICS_OUT_TIME);
 };
 
 Input.prototype._transfer = function(e) {
@@ -121,14 +130,65 @@ Input.prototype._transfer = function(e) {
         LocalClient.bufferqueue[0].pushChunk(chunk);
     else
         LocalClient.bufferqueue[1].pushChunk(chunk);
+
+    // statistics
+    if (this.state == "connected") {
+        this.transferred++;
+        if (this.transferred >= FULL_PACK_NUM) {
+            this.state = "ready";
+
+            var incap = LocalClient.inputCap();
+            if (incap > 1) {
+                this.state = "released";
+                if (this.onrelease)
+                    this.onrelease();
+            } else if (incap == 1) {
+                this.state = "reserved";
+                this._bind(true);
+                //TODO: close conn
+            } else {
+                this.state = "running";
+                this._bind(false);
+            }
+        }
+    }
     //TODO: slice
     //TODO: statistics
 };
 
-Input.prototype._timeout = function() {
-    console.log("//TODO: timeout")
+/**
+ * evaluate the input capability and report to server
+ * @param {number} value
+ * @private
+ */
+Input.prototype._evaluate = function(value) {
+    this._masterConn.send({
+        type: "evaluate",
+        id: this.remote,
+        value: value
+    });
 };
 
-Input.prototype._bind = function() {
+Input.prototype._timeout = function() {
+    if (this.state == "connected") {
+        // Transfer capability lack
+        this.state = "timeout";
+        // report
+        this._evaluate(0);
+        if (this.ontimeout)
+            this.ontimeout();
+    }
+};
 
+/**
+ * report to server the bind is ok
+ * @param {boolean} reserved
+ * @private
+ */
+Input.prototype._bind = function(reserved) {
+    this._masterConn.send({
+        type: "bind",
+        id: this.remote,
+        reserved: reserved
+    })
 };

@@ -101,16 +101,13 @@ Client.prototype.onmastermessage = function(e) {
     switch (data.type) {
         case "id":
             this.id = data.id;
-            console.log(data);
             break;
         case "peek":
-            /*console.log(data);
             var peeked = data.peek;
             var inputs = LocalClient.getReusedInputs(peeked.length);
             for (var i = 0; i < peeked.length; i++) {
                 inputs[i].dial(LocalClient.masterConn, peeked[i]);
-            }*/
-            LocalClient.getReusedInputs(1)[0].dial(LocalClient.masterConn, "server");
+            }
 
             //TODO
     }
@@ -145,7 +142,11 @@ Client.prototype.inputCap = function() {
     for (var i = 0; i < this.inputs.length; i++) {
         if (this.inputs[i].state == "running" || this.inputs[i].
         state == "reserved")
+        {
+            if (this.inputs[i].remote == "server")
+                ret++;
             ret++;
+        }
     }
     return ret;
 };

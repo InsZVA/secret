@@ -13,6 +13,40 @@ var (
 	TRANSPORT = "chunk"
 )
 
+// switch is a sync tool for 2 peers
+// ensure that A B A B A B A B
+// avoid A A B B A B B A
+type Switch struct {
+	a chan bool
+	b chan bool
+}
+
+func (s *Switch) Reset() {
+	s.a = make(chan bool, 1)
+	s.b = make(chan bool, 1)
+	s.a <- true
+}
+
+func (s *Switch) AWait() {
+	<- s.a
+}
+
+func (s *Switch) ARelease() {
+	s.b <- true
+}
+
+func (s *Switch) BWait() {
+	<- s.b
+}
+
+func (s *Switch) BRelease() {
+	s.a <- true
+}
+
+func (s *Switch) Inited() bool {
+	return s.a != nil && s.b != nil
+}
+
 // 0: Video
 // 1: Audio
 type Stream struct {
@@ -20,6 +54,7 @@ type Stream struct {
 
 	chanlist list.List  // TODO: minimum lock
 	lock     sync.RWMutex // TODO: lock list
+	sw	Switch
 }
 
 func (s *Stream) init() *Stream {
