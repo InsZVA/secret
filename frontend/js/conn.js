@@ -16,6 +16,11 @@ function ConnMaster(url) {
     this._clientConns = [];
     this.onmessage = null;
     this.onunkownmessage = null;
+
+    /** cache a client message if the clientconn not found
+        to make p2p connect fast
+     */
+    this.cachedClientMessage = [];
 }
 
 ConnMaster.prototype.connect = function() {
@@ -46,19 +51,24 @@ ConnMaster.prototype.dispatchMsg = function(e) {
             return this.onunkownmessage(e);
         return null;
     }
-    console.log(data);
 
     if (data.type && data.type != "forward") {
         return this.onmessage(e);
     }
 
     if (data.srcId) {
-        if (this._clientConns[srcId] && this._clientConns[srcId].onmessage) {
-            return this._clientConns[srcId].onmessage(e);
-        } else if (this.onunkownmessage) {
-            return this.onunkownmessage(e);
+        if (this._clientConns[data.srcId] && this._clientConns[data.srcId].onmessage) {
+            return this._clientConns[data.srcId].onmessage(e);
         } else {
-            return null;
+            console.log("cached");
+            if (!this.cachedClientMessage)
+                this.cachedClientMessage[data.srcId] = [];
+            this.cachedClientMessage.push(e);
+            if (this.onunkownmessage) {
+                return this.onunkownmessage(e);
+            } else {
+                return null;
+            }
         }
     } else {
         if (this.onunkownmessage)
@@ -76,7 +86,7 @@ ConnMaster.prototype.newClientConn = function(remoteId) {
     if (this._clientConns[remoteId])
         return this._clientConns[remoteId];
     var c = new ClientConn(this, remoteId);
-    this._clientConns[remote] = c;
+    this._clientConns[remoteId] = c;
     return c;
 };
 
@@ -98,6 +108,8 @@ function ClientConn(masterConn, remoteId) {
  * @param {Object} data
  */
 ClientConn.prototype.send = function(data) {
+    data.srcId = LocalClient.id;
+    data.dstId = this._remoteId;
     data.type = "forward";
-    data.srcId = LocalClient.clientId;
+    this._masterConn.send(data);
 };

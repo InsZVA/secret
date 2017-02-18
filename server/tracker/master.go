@@ -515,21 +515,24 @@ const (
 	SERVER_OUTPUT_CAPABILITY = 2
 )
 
-func (cm *ClientMap) PeekLevel(l int) []*Client {
+func (cm *ClientMap) PeekLevel(cli *Client, l int) []*Client {
 	cm.lock.Lock()
 	defer cm.lock.Unlock()
 	peeked := []*Client{}
 	i := 0
 	for _, c := range cm.m {
+		if c.id == cli.id { continue }
 		if c.Level() - l < 2 && c.Level() - 1 > -2 &&
 			c.state != CLIENT_STATE_IN_TRASACTION {
 			if c.OutputAvailable() || i < 2 {
+				// i < 2 means randomly peek 2 client to evaluate
 				peeked = append(peeked, c)
-			}
-			if len(peeked) > 5 {
-				return peeked
+				if len(peeked) > 5 {
+					return peeked
+				}
 			}
 		}
+		i++
 	}
 	return peeked
 }
@@ -537,12 +540,12 @@ func (cm *ClientMap) PeekLevel(l int) []*Client {
 func (cli *Client) Find() []*Client {
 	level := cli.Level()
 	if level < 1 {
-		if clientMap.n < SERVER_OUTPUT_CAPABILITY {
+		if clientMap.n <= SERVER_OUTPUT_CAPABILITY {
 			return []*Client{&server}
 		}
 		level = maxLevel / 2 + 1
 	}
-	return clientMap.PeekLevel(level)
+	return clientMap.PeekLevel(cli, level)
 }
 
 // Free some output of specify state
@@ -720,6 +723,17 @@ func (cli *Client) translateMsg(data map[string]interface{}, conn *websocket.Con
 			panic("param type error")
 		}
 		cli.Evaluate(dst, value != 0)
+	case "forward":
+		dstid, ok := data["dstId"].(string)
+		if !ok {
+			panic("param type error")
+		}
+		dst := clientMap.Get(dstid)
+		if dst == nil {
+			// TODO
+		}
+		//TODO: control single thread to produce
+		dst.conn.WriteJSON(data)
 	}
 	if len(ret) != 0 {
 		conn.WriteJSON(ret)

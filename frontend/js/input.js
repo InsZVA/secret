@@ -28,7 +28,7 @@ function Input() {
     // remote client id
     this.remote = null;
     // PeerConnection
-    this.pc = new RTCPeerConnection();
+    this.pc = null;
     // DataChannel
     this.dc = null;
     // WebSocket
@@ -75,28 +75,63 @@ Input.prototype.dial = function(masterConn, clientId) {
         this.remote = clientId;
         this._masterConn = masterConn;
         this.conn = masterConn.newClientConn(clientId);
+
         this.pc = new RTCPeerConnection(LocalClient.rtcConfig);
-        pc.createOffer().then(function(offer) {
-            return this.pc.setLocalDescription(offer);
-        }.bind(this)).then(function() {
+        this.pc.onicecandidate = function (event) {
             this.conn.send({
-                type: "offer",
+                cmd: "icecandidate",
+                candidate: event.candidate
+            });
+        }.bind(this);
+
+        this.dc = this.pc.createDataChannel("inslive");
+        this.dc.binaryType = 'arraybuffer';
+        this.dc.onopen = function() {
+            this._start(this.dc);
+        }.bind(this);
+
+        this.state = "connecting";
+        this.dc.onmessage = this._transfer.bind(this);
+        this.dc.onclose = function() {
+            this.dc.onopen = null;
+            this.dc.onclose = null;
+        }.bind(this);
+
+        this.pc.createOffer().then(function (offer) {
+            return this.pc.setLocalDescription(offer);
+        }.bind(this)).then(function () {
+            this.conn.onmessage = this._onmessage.bind(this);
+            this.conn.send({
+                cmd: "offer",
                 sdp: this.pc.localDescription
             });
-            this.conn.onmessage = function(e) {
-                var data = e.data;
-                var msg;
-                try {
-                    msg = JSON.parse(data);
-                } catch(exception) {
-                    return null;
-                }
-                if (msg.type && msg.type == "answer") {
-                    this.pc.setRemoteDescription(msg.sdp);
-                }
-            }.bind(this);
         }.bind(this));
-        //TODO: create data channel
+
+    }
+};
+
+/**
+ * on WebRTC signal message
+ * @param {Event} e
+ * @private
+ */
+Input.prototype._onmessage = function(e) {
+    if (this.remote != "server") {
+        console.log(e);
+    }
+    var data = e.data;
+    var msg;
+    try {
+        msg = JSON.parse(data);
+    } catch(exception) {
+        return null;
+    }
+    if (msg.cmd && msg.cmd == "icecandidate") {
+        if (msg.candidate != "")
+            this.pc.addIceCandidate(new RTCIceCandidate(data.candidate))
+    }
+    if (msg.cmd && msg.cmd == "answer") {
+        this.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
     }
 };
 
@@ -106,6 +141,7 @@ Input.prototype._start = function(conn) {
 };
 
 Input.prototype._transfer = function(e) {
+    LocalClient.forward(e);
     var data, offset;
     if (LocalClient.inited < 2) {
         data = new Uint8Array(e.data);
