@@ -3,19 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="26df5df3-e2c7-4d0d-9bd5-2ab4f0c10be4" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/js/bigendian.js" afterPath="$PROJECT_DIR$/js/bigendian.js" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/js/bufferqueue.js" afterPath="$PROJECT_DIR$/js/bufferqueue.js" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/js/client.js" afterPath="$PROJECT_DIR$/js/client.js" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/js/conn.js" afterPath="$PROJECT_DIR$/js/conn.js" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/js/input.js" afterPath="$PROJECT_DIR$/js/input.js" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/js/mse.js" afterPath="$PROJECT_DIR$/js/mse.js" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/js/output.js" afterPath="$PROJECT_DIR$/js/output.js" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/js/restructor.js" afterPath="$PROJECT_DIR$/js/restructor.js" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/js/test/mse with buffer.html" afterPath="$PROJECT_DIR$/js/test/mse with buffer.html" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/js/test/mse.html" afterPath="$PROJECT_DIR$/js/test/mse.html" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/../server/.idea/workspace.xml" afterPath="$PROJECT_DIR$/../server/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/../server/tracker/input.go" afterPath="$PROJECT_DIR$/../server/tracker/input.go" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/../server/tracker/master.go" afterPath="$PROJECT_DIR$/../server/tracker/master.go" />
     </list>
     <ignored path="$PROJECT_DIR$/.tmp/" />
     <ignored path="$PROJECT_DIR$/temp/" />
@@ -80,8 +68,8 @@
       <file leaf-file-name="input.js" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/js/input.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="229">
-              <caret line="165" column="40" lean-forward="true" selection-start-line="165" selection-start-column="40" selection-end-line="165" selection-end-column="40" />
+            <state relative-caret-position="253">
+              <caret line="166" column="26" lean-forward="true" selection-start-line="166" selection-start-column="26" selection-end-line="166" selection-end-column="26" />
               <folding>
                 <element signature="n#!!doc;n#InputManager#0" expanded="false" />
               </folding>
@@ -475,15 +463,15 @@
       <workItem from="1487398157449" duration="18048000" />
       <workItem from="1487488571648" duration="9425000" />
       <workItem from="1488001972724" duration="599000" />
-      <workItem from="1488089686276" duration="10765000" />
+      <workItem from="1488089686276" duration="11953000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="259237000" />
+    <option name="totallyTimeSpent" value="260425000" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="-9" y="-9" width="1938" height="1060" extended-state="6" />
+    <frame x="-9" y="-9" width="1938" height="1060" extended-state="7" />
     <editor active="true" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24791667" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
@@ -715,8 +703,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/js/input.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="229">
-          <caret line="165" column="40" lean-forward="true" selection-start-line="165" selection-start-column="40" selection-end-line="165" selection-end-column="40" />
+        <state relative-caret-position="253">
+          <caret line="166" column="26" lean-forward="true" selection-start-line="166" selection-start-column="26" selection-end-line="166" selection-end-column="26" />
           <folding>
             <element signature="n#!!doc;n#InputManager#0" expanded="false" />
           </folding>

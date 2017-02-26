@@ -62,6 +62,7 @@ func InputHandler(path []string, w http.ResponseWriter, r *http.Request) {
 		}
 
 		if fts[0] == "v" {
+			stream.vid = 0
 			stream.track[0].codec = points[0]
 			stream.track[0].initChunk, err = ioutil.ReadAll(r.Body)
 			debug("Video " + sid + " header:" + points[0])
@@ -74,6 +75,7 @@ func InputHandler(path []string, w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(200); return
 		}
 		if fts[0] == "a" {
+			stream.aid = 0
 			stream.track[1].codec = points[0]
 			stream.track[1].initChunk, err = ioutil.ReadAll(r.Body)
 			debug("Audio " + sid + " header:" + points[0])
