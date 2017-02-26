@@ -101,6 +101,8 @@ function ClientConn(masterConn, remoteId) {
     this._remoteId = remoteId;
     // function(event)
     this.onmessage = null;
+    this._split = false;
+    this._channels = [];
 }
 
 /**
@@ -113,3 +115,58 @@ ClientConn.prototype.send = function(data) {
     data.type = "forward";
     this._masterConn.send(data);
 };
+
+//
+// /**
+//  * split a client to channels
+//  */
+// ClientConn.prototype.split = function() {
+//     this._split = true;
+//     /**
+//      * @type {Array<ClientChannel>}
+//      * @private
+//      */
+//     this._channels = [];
+//     this.onmessage = this.dispatchMsg.bind(this);
+// };
+//
+// ClientConn.prototype.dispatchMsg = function(e) {
+//     var msg;
+//     try {
+//         msg = JSON.parse(e.data);
+//     } catch (exception) {
+//         throw exception;
+//     }
+//
+//     if (msg.channelId && this._channels[msg.channelId]) {
+//         this._channels[msg.channelId].onmessage(e);
+//     }
+//
+//     //TODO
+// };
+//
+// /**
+//  * new Client Channel
+//  * @param channelId
+//  * @returns {ClientChannel}
+//  */
+// ClientConn.prototype.newChannel = function(channelId) {
+//     if (this._channels[channelId])
+//         return this._channels[channelId];
+//     var c = new ClientChannel(this, channelId);
+//     this._clientConns[channelId] = c;
+//     return c;
+// };
+//
+// /**
+//  * ClientChannel split the ClientConn to many channels
+//  * !!!NOTE!!! DO NOT DIRECTLY CALL THIS CONSTRUCTOR
+//  * @param {ClientConn} clientConn
+//  * @param {number} channelId
+//  * @constructor
+//  */
+// function ClientChannel(clientConn, channelId) {
+//     this._clientConn = clientConn;
+//     this._channelId = channelId;
+//     this.onmessage = null;
+// }

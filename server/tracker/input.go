@@ -5,7 +5,6 @@ import (
 	"strings"
 	"sync"
 	"io/ioutil"
-	"strconv"
 )
 
 var streamMap = StreamMap {m: make(map[string]*Stream)}
@@ -103,27 +102,33 @@ func InputHandler(path []string, w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(403); return
 		}
-		id, err := strconv.Atoi(points[0])
+
+		/*id, err := strconv.Atoi(points[0])
 		if err != nil {
 			w.WriteHeader(403); return
 		}
+		BUG: the ffmpeg output number is not always right*/
+
 		ck := Chunk{
-			id: uint32(id),
 			data: buff,
 		}
 		if fts[0] == "v" {
+			ck.id = stream.vid
+			stream.vid++
+
 			stream.sw.AWait()
 			ck.codec = stream.track[0].codec
 			stream.track[0].buffer.push(ck)
-			debug("Video " + sid + " buffered")
 			stream.sw.ARelease()
 			w.WriteHeader(200); return
 		}
 		if fts[0] == "a" {
+			ck.id = stream.aid
+			stream.aid++
+
 			stream.sw.BWait()
 			ck.codec = stream.track[1].codec
 			stream.track[1].buffer.push(ck)
-			debug("Audio " + sid + " buffered")
 			stream.sw.BRelease()
 			w.WriteHeader(200); return
 		}

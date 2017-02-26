@@ -88,8 +88,14 @@ func (cli *Client) InfoHTML() string {
 			switch in.state {
 			case INPUT_STATE_RUNNING:
 				t += "Running"
+				if source := cli.inputs[i].output; source != nil {
+					t += ":[from]" + source.id
+				}
 			case INPUT_STATE_RESERVED:
 				t += "Reserved"
+				if source := cli.inputs[i].output; source != nil {
+					t += ":[from]" + source.id
+				}
 			case INPUT_STATE_CLOSE:
 				t += "Close"
 			}
@@ -105,8 +111,14 @@ func (cli *Client) InfoHTML() string {
 			switch ou.state {
 			case OUTPUT_STATE_RUNNING:
 				t += "Running"
+				if dst := cli.outputs[i].input; dst != nil {
+					t += ":[to]" + dst.id
+				}
 			case OUTPUT_STATE_RESERVED:
 				t += "Reserved"
+				if dst := cli.outputs[i].input; dst != nil {
+					t += ":[to]" + dst.id
+				}
 			case OUTPUT_STATE_CLOSE:
 				t += "Close"
 			case OUTPUT_STATE_READY:
@@ -324,7 +336,7 @@ func (cli *Client) TransactionBegin(dst *Client, msg string) bool {
 // end both peers' transaction
 func (t *Transaction) End() {
 	i := 0
-	if t.a.transaction != nil {
+	if t.a.transaction != nil && len(t.a.transaction) != 0 {
 		for ; i < len(t.a.transaction); i++ {
 			if t.a.transaction[i].b == t.b {
 				break
@@ -332,7 +344,7 @@ func (t *Transaction) End() {
 		}
 		t.a.transaction = append(t.a.transaction[:i], t.a.transaction[i+1:]...)
 	}
-	if t.b.transaction != nil {
+	if t.b.transaction != nil && len(t.b.transaction) != 0 {
 		for i = 0; i < len(t.b.transaction); i++ {
 			if t.b.transaction[i].b == t.a {
 				break
@@ -667,14 +679,14 @@ func MasterHandler(path []string, w http.ResponseWriter, r *http.Request) {
 }
 
 func (cli *Client) translateMsg(data map[string]interface{}, conn *websocket.Conn) {
-	defer func() {
+	/*defer func() {
 		if e := recover(); e != nil {
 			err := make(map[string]interface{})
 			err["type"] = "error"
 			err["msg"] = e
 			conn.WriteJSON(err)
 		}
-	} ()
+	} ()*/
 
 	tp, ok := data["type"]
 	if !ok {

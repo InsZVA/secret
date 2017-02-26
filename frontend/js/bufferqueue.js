@@ -5,6 +5,10 @@
 function BufferQueue(length) {
     this._state = "fastload";
     this.length = length || 2;
+    /**
+     * @type {Array<Chunk>}
+     * @private
+     */
     this._handlerqueue = [];
     this.onstatechange = null;
     /**

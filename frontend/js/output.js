@@ -52,9 +52,46 @@ Output.prototype.bind = function (masterConn, clientId) {
     }
 
     this.pc.ondatachannel = function(ev) {
+        console.log(ev);
         this.dc = ev.channel;
-        this.state = "transferring";
+        this.dc.onopen = function() {
+            this.fastload();
+            this.state = "transferring";
+        }.bind(this);
+        this.dc.onclose = this.close.bind(this);
+        this.dc.onmessage = function(e) {
+            var msg;
+            try {
+                msg = JSON.parse(e.data);
+            } catch (exception) {
+                throw exception;
+            }
+            if (msg.reserved) {
+                this.reserve();
+            }
+        }.bind(this);
     }.bind(this);
+};
+
+Output.prototype.fastload = function() {
+    if (!this.dc) return;
+    var running = LocalClient.runningInput();
+    if (running == -1) return;
+    this.send(LocalClient.initmsg[0].raw);
+    this.send(LocalClient.initmsg[1].raw);
+    var fastloads = [];
+
+    for (var j = 0; j < 2; j++)
+        for (var i = 0; i < LocalClient.bufferqueue[j]._handlerqueue.length; i++) {
+            fastloads.push(LocalClient.bufferqueue[j]._handlerqueue[i].raw);
+        }
+    while (fastloads.length > 0) {
+        var index = parseInt(Math.random() * fastloads.length);
+        this.send(fastloads[index]);
+        fastloads = fastloads.slice(0, index).concat(
+            fastloads.slice(index+1)
+        );
+    }
 };
 
 /**
@@ -72,8 +109,7 @@ Output.prototype._onmessage = function(e) {
         return null;
     }
     if (msg.cmd && msg.cmd == "icecandidate") {
-        if (data.candidate != "")
-            this.pc.addIceCandidate(new RTCIceCandidate(data.candidate))
+        this.pc.addIceCandidate(new RTCIceCandidate(msg.candidate))
     } else if (msg.cmd && msg.cmd == "offer") {
         this.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
         this.pc.createAnswer().then(function(answer) {
@@ -89,9 +125,25 @@ Output.prototype._onmessage = function(e) {
 
 /**
  * send a event by data-channel
- * @param {Event} e
+ * @param {*} data
  */
-Output.prototype.send = function(e) {
-    var data = new Uint8Array(e.data);
+Output.prototype.send = function(data) {
     this.dc.send(data);
+};
+
+/**
+ * close the output and clean the resource
+ */
+Output.prototype.close = function() {
+    console.log("close output");
+    this.state = "close";
+};
+
+/**
+ * change this output to reserved, this function will be called
+ * when the peer send "reserve" message via datachannel.
+ */
+Output.prototype.reserve = function() {
+    console.log("reserve output");
+    this.state = "reserved";
 };

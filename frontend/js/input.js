@@ -37,6 +37,8 @@ function Input() {
     // Client: masterConn proxy
     this.conn = null;
 
+    // a connect operation end(success or fail)
+    this.onconnectover = null;
     this.onclose = null;
     this.ontimeout = null;
     this.onrelease = null;
@@ -91,7 +93,9 @@ Input.prototype.dial = function(masterConn, clientId) {
         }.bind(this);
 
         this.state = "connecting";
-        this.dc.onmessage = this._transfer.bind(this);
+        this.dc.onmessage = function(e) {
+            this._transfer(e);
+        }.bind(this);
         this.dc.onclose = function() {
             this.dc.onopen = null;
             this.dc.onclose = null;
@@ -116,9 +120,6 @@ Input.prototype.dial = function(masterConn, clientId) {
  * @private
  */
 Input.prototype._onmessage = function(e) {
-    if (this.remote != "server") {
-        console.log(e);
-    }
     var data = e.data;
     var msg;
     try {
@@ -127,8 +128,7 @@ Input.prototype._onmessage = function(e) {
         return null;
     }
     if (msg.cmd && msg.cmd == "icecandidate") {
-        if (msg.candidate != "")
-            this.pc.addIceCandidate(new RTCIceCandidate(data.candidate))
+        this.pc.addIceCandidate(new RTCIceCandidate(msg.candidate))
     }
     if (msg.cmd && msg.cmd == "answer") {
         this.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
@@ -143,14 +143,21 @@ Input.prototype._start = function(conn) {
 Input.prototype._transfer = function(e) {
     LocalClient.forward(e);
     var data, offset;
-    if (LocalClient.inited < 2) {
+    if (!this.inited) this.inited = 0;
+
+    if (this.inited < 2) {
+        if (LocalClient.inited != 0) return;
         data = new Uint8Array(e.data);
-        LocalClient.initmsg[LocalClient.inited] = new InitMsg(data);
-        LocalClient.inited++;
-        console.log("init");
-        if (LocalClient.inited == 2) {
+        if (!this.initmsg) this.initmsg = [];
+        this.initmsg[this.inited] = new InitMsg(data);
+        this.inited++;
+        if (this.inited == 2) {
+            LocalClient.inited = 2;
+            LocalClient.initmsg = [new InitMsg(this.initmsg[0].raw),
+                new InitMsg(this.initmsg[1].raw)];
             LocalClient.mse = new MSE(LocalClient.videoElement,
                 LocalClient.initmsg[0], LocalClient.initmsg[1]);
+            console.log("init");
         }
         return
     }
@@ -159,8 +166,11 @@ Input.prototype._transfer = function(e) {
     offset = bigendian.readUint32(data);
     var chunk = new Chunk(
         bigendian.readUint32(data.slice(4)),
-        new Uint8Array(data.slice((offset)))
+        new Uint8Array(data.slice((offset))),
+        new Uint8Array(e.data)
     );
+    // if (this.remote != "server")
+    //     console.log(chunk);
     var codec = new TextDecoder("utf-8").decode(data.slice(8, offset));
     if (codec == "vp9")
         LocalClient.bufferqueue[0].pushChunk(chunk);
@@ -181,7 +191,9 @@ Input.prototype._transfer = function(e) {
             } else if (incap == 1) {
                 this.state = "reserved";
                 this._bind(true);
-                //TODO: close conn
+                this.dc.send(JSON.stringify({
+                    reserved: true
+                }));
             } else {
                 this.state = "running";
                 this._bind(false);
@@ -222,9 +234,10 @@ Input.prototype._timeout = function() {
  * @private
  */
 Input.prototype._bind = function(reserved) {
+    console.log(reserved);
     this._masterConn.send({
         type: "bind",
         id: this.remote,
         reserved: reserved
-    })
+    });
 };

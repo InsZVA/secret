@@ -21,11 +21,13 @@ function Slice(cid, sid, stotal, data) {
  * chunk
  * @param {number} id - chunk id
  * @param {Uint8Array} data
+ * @param {Uint8Array} raw
  * @constructor
  */
-function Chunk(id, data) {
+function Chunk(id, data, raw) {
     this.id = id;
     this.data = data;
+    this.raw = raw;
 }
 
 /**
@@ -72,7 +74,7 @@ SplitedChunk.prototype.pushSlice = function(slice) {
         for (var i = 0; i < this._total; i++) {
             data = data.concat(Array.from(this._slices[i]));
         }
-        return new Chunk(this._id, new Uint8Array(data));
+        return new Chunk(this._id, new Uint8Array(data), null);
     }
     return null;
 };

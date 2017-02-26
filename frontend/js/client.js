@@ -19,12 +19,12 @@ function Client(config) {
     this.masterConn = new ConnMaster((config.master || 'ws://127.0.0.1:8888/master'));
     this.streamAddr = config.streamAddr || 'ws://127.0.0.1:8888/stream/test';
     this.transmode = config.transmode || "chunk";
-    this.rtcConfig = config.rtcConfig || {/*
-            iceServers: [{
+    this.rtcConfig = config.rtcConfig || {
+            iceServers: [/*{
                 urls: [
                     //"stun:stun.example.com"
                 ]
-            }]*/
+            }*/]
         };
     this.bufferLength = config.bufferLength || 4;
     this.videoElement = config.videoElement;
@@ -158,7 +158,7 @@ Client.prototype.endtransaction = function() {
         this.transactions = [];
         this.state = "ready";
     } else {
-        throw "Not in transaction"
+        //throw "Not in transaction"
     }
 };
 
@@ -238,7 +238,7 @@ Client.prototype.forward = function(e) {
     for (var i = 0; i < LocalClient.outputs.length; i++) {
         if (LocalClient.outputs[i].state == "transferring" ||
             LocalClient.outputs[i].state == "running") {
-            LocalClient.outputs[i].send(e);
+            LocalClient.outputs[i].send(e.data);
         }
     }
 };

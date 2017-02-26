@@ -14,7 +14,7 @@ _bigendian.prototype.readUint32 = function(data) {
     if (data.length < 4) throw "Bigendian: data overflow";
     var ret = 0;
     for (var i = 0; i < 4; i++) {
-        ret <<= 1;
+        ret <<= 8;
         ret |= data[i];
     }
     return ret;

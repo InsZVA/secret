@@ -9,6 +9,7 @@
  */
 function InitMsg(raw) {
     var offset = bigendian.readUint32(raw);
+    this.raw = raw;
     var codec = bigendian.readString(raw.slice(4), offset - 4);
     this.codec = this.fullmimie(codec);
     this.data = new Uint8Array(raw.slice(offset));

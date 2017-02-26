@@ -55,6 +55,10 @@ type Stream struct {
 	chanlist list.List  // TODO: minimum lock
 	lock     sync.RWMutex // TODO: lock list
 	sw	Switch
+
+	// Atomic int id
+	aid uint32
+	vid uint32
 }
 
 func (s *Stream) init() *Stream {
