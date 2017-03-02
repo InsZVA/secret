@@ -109,7 +109,7 @@ func InputHandler(path []string, w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(403); return
 		}
-		BUG: the ffmpeg output number is not always right*/
+		*/
 
 		ck := Chunk{
 			data: buff,

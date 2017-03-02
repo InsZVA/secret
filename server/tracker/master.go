@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"strconv"
 	"sort"
+	"github.com/awalterschulze/gographviz"
 )
 
 const (
@@ -51,21 +52,48 @@ func (cm *ClientMap) Remove(k string) {
 	cm.n--
 }
 
-type Transaction struct {
-	a *Client
-	b *Client
-	msg string
+func (cm *ClientMap) GraphString() string {
+	cm.lock.RLock()
+	defer cm.lock.RUnlock()
+	g := gographviz.NewGraph()
+	g.SetName("ClientMap")
+	g.AddNode("ClientMap", "Server", nil)
+	for _, c := range cm.m {
+		g.AddNode("ClientMap", "\""+c.addr+"\"", nil)
+	}
+	for _, ou := range server.outputs {
+		if ou.input == nil { continue }
+		switch ou.state {
+		case OUTPUT_STATE_READY:
+		case OUTPUT_STATE_CLOSE:
+		case OUTPUT_STATE_RUNNING:
+			g.AddEdge("Server", "\""+ou.input.addr+"\"",
+				true, nil)
+		case OUTPUT_STATE_RESERVED:
+			g.AddEdge("Server", "\""+ou.input.addr+"\"",
+				false, nil)
+		}
+	}
+	for _, c := range cm.m {
+		for _, ou := range c.outputs {
+			if ou.input == nil { continue }
+			switch ou.state {
+			case OUTPUT_STATE_READY:
+			case OUTPUT_STATE_CLOSE:
+			case OUTPUT_STATE_RUNNING:
+				g.AddEdge("\""+c.addr+"\"", "\""+ou.input.addr+"\"",
+					true, nil)
+			case OUTPUT_STATE_RESERVED:
+				g.AddEdge("\""+c.addr+"\"", "\""+ou.input.addr+"\"",
+					false, nil)
+			}
+		}
+	}
+	return "di" + g.String()
 }
 
-type Client struct {
-	id string
-	state int
-	inputs []Input
-	outputs []Output
-	addr string
-	conn *websocket.Conn
-	evaluated bool
-	transaction []Transaction
+func (cm *ClientMap) OutputJPG(func (path string)) {
+
 }
 
 func (cli *Client) InfoHTML() string {
@@ -89,12 +117,14 @@ func (cli *Client) InfoHTML() string {
 			case INPUT_STATE_RUNNING:
 				t += "Running"
 				if source := cli.inputs[i].output; source != nil {
-					t += ":[from]" + source.id
+					t += ":[from]<a href='/client/" + source.id +
+						"'>" + source.id + "</a>"
 				}
 			case INPUT_STATE_RESERVED:
 				t += "Reserved"
 				if source := cli.inputs[i].output; source != nil {
-					t += ":[from]" + source.id
+					t += ":[from]<a href='/client/" + source.id +
+						"'>" + source.id + "</a>"
 				}
 			case INPUT_STATE_CLOSE:
 				t += "Close"
@@ -112,12 +142,14 @@ func (cli *Client) InfoHTML() string {
 			case OUTPUT_STATE_RUNNING:
 				t += "Running"
 				if dst := cli.outputs[i].input; dst != nil {
-					t += ":[to]" + dst.id
+					t += ":[to]<a href='/client/" + dst.id +
+						"'>" + dst.id + "</a>"
 				}
 			case OUTPUT_STATE_RESERVED:
 				t += "Reserved"
 				if dst := cli.outputs[i].input; dst != nil {
-					t += ":[to]" + dst.id
+					t += ":[to]<a href='/client/" + dst.id +
+						"'>" + dst.id + "</a>"
 				}
 			case OUTPUT_STATE_CLOSE:
 				t += "Close"
@@ -142,6 +174,23 @@ func (cli *Client) InfoHTML() string {
 	}
 	t += "</td></tr></table>"
 	return t
+}
+
+type Transaction struct {
+	a *Client
+	b *Client
+	msg string
+}
+
+type Client struct {
+	id string
+	state int
+	inputs []Input
+	outputs []Output
+	addr string
+	conn *websocket.Conn
+	evaluated bool
+	transaction []Transaction
 }
 
 var maxLevel = 0
@@ -434,6 +483,11 @@ func (cli *Client) EndTransactions(ids []int) {
 			panic("impossible")
 		}
 	}
+
+	for ; i < len(cli.transaction); i++ {
+		left = append(left, cli.transaction[i])
+	}
+
 	for _, t := range todel {
 		t.End()
 	}
@@ -521,6 +575,7 @@ func (cli *Client) Evaluate(dst *Client, value bool) {
 			cli.transaction[i].End()
 		}
 	}
+	dst.evaluated = true
 }
 
 const (

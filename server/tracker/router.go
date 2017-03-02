@@ -26,6 +26,9 @@ func (router Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "client":
 		ClientHandler(path, w, r)
 		return
+	case "graph":
+		GraphHandler(path, w, r)
+		return
 	}
 
 	w.WriteHeader(404)

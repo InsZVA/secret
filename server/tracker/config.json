@@ -1,5 +1,6 @@
 {
   "listenPort": 8888,
   "transport": "chunk",
-  "cacheLength": 5
+  "cacheLength": 5,
+  "dotPath": "C:\\Program Files (x86)\\Graphviz2.38\\bin\\dot.exe"
 }
